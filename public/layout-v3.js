@@ -15,16 +15,17 @@
       #home .route-buttons button{min-height:74px;font-size:1.18rem;border-radius:20px}
       #home #routePreview{display:none!important}
       #home .content{justify-content:flex-start;padding-top:6px}
-      #home .bus-strip{margin-top:4px;min-height:104px;border-radius:20px;padding:16px}
-      #home .bus-strip.route-not-selected{display:none!important}
+      #home .bus-strip{margin-top:4px;height:104px;min-height:104px;border-radius:20px;padding:16px;flex-shrink:0}
+      #home .bus-strip.route-not-selected{visibility:hidden!important;display:flex!important}
       #home .actions{margin-top:auto}
       #home #startButton{min-height:56px}
       #home .actions>.danger{min-height:58px;font-size:1.15rem}
       #home .actions>.ghost{display:none!important}
-      #trip .top{display:block;position:relative}
-      #trip .trip-top-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+      #trip .top{display:block;position:relative;min-height:196px}
+      #trip .trip-top-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;min-height:50px}
       #trip .trip-title{font-size:.88rem;opacity:.7;text-align:right;line-height:1.2;flex:1}
       #trip .top-controls{flex-shrink:0}
+      #tripTransit{position:absolute;top:88px;left:0;right:0;height:104px;min-height:104px;border-radius:20px;padding:16px;margin:0}
       #trip .content{justify-content:flex-end;gap:10px;padding-top:4px}
       #trip .card{padding:15px 18px;border-radius:22px;flex-shrink:0}
       #trip .icon{font-size:2.5rem}
@@ -41,18 +42,20 @@
       #trip .actions>.danger{min-height:58px;font-size:1.15rem}
       #trip #backToHomeButton{min-height:54px}
       #trip #busButton{min-height:54px}
-      #tripTransit{border-radius:18px;padding:10px 13px}
       #wakeStatus{font-size:.7rem}
       @media(max-height:760px){
-        #trip .landmark-feedback img{max-height:32vh!important;min-height:170px}
-        #trip .message{font-size:1.18rem}
-        #trip .card{padding:12px 16px}
+        #trip .top{min-height:174px}
+        #tripTransit{top:68px;height:100px;min-height:100px}
+        #trip .landmark-feedback img{max-height:30vh!important;min-height:160px}
+        #trip .message{font-size:1.16rem}
+        #trip .card{padding:11px 15px}
         #home .route-buttons button{min-height:64px}
+        #home .bus-strip{height:100px;min-height:100px}
       }
       @media(max-width:380px){
         .top-panel h1{font-size:1.65rem}
         .top-icon-button{width:42px!important;height:42px!important;min-width:42px;font-size:1.32rem!important}
-        #trip .landmark-feedback img{min-height:180px}
+        #trip .landmark-feedback img{min-height:165px}
       }
     `;
     document.head.appendChild(style);
@@ -117,7 +120,16 @@
   function syncEtaVisibility() {
     const strip = document.querySelector('#home .bus-strip');
     if (!strip) return;
-    strip.classList.toggle('route-not-selected', !window.selectedRoute);
+    strip.classList.toggle('route-not-selected', !selectedRoute);
+  }
+
+  function startHomeEtaPolling() {
+    if (!selectedRoute) return;
+    refreshEta();
+    if (etaTimer) clearInterval(etaTimer);
+    etaTimer = setInterval(() => {
+      if (!tripId && selectedRoute) refreshEta();
+    }, 20000);
   }
 
   function install() {
@@ -129,8 +141,12 @@
 
     const school = document.getElementById('schoolRouteButton');
     const home = document.getElementById('homeRouteButton');
-    school?.addEventListener('click', () => setTimeout(syncEtaVisibility, 0));
-    home?.addEventListener('click', () => setTimeout(syncEtaVisibility, 0));
+    const routeChosen = () => setTimeout(() => {
+      syncEtaVisibility();
+      startHomeEtaPolling();
+    }, 0);
+    school?.addEventListener('click', routeChosen);
+    home?.addEventListener('click', routeChosen);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 0));
