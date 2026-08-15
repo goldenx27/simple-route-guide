@@ -1,6 +1,8 @@
 (() => {
   const PARENT_PHONE = '0546187090';
   const sentArrivals = new Set();
+  let routeRunId = null;
+  let tripWasVisible = false;
 
   function b64ToBytes(value) {
     const padded = value + '='.repeat((4 - value.length % 4) % 4);
@@ -35,9 +37,42 @@
   window.sendHelp=async function(){navigator.vibrate?.([180,100,180]);const ok=confirm('🆘 צריך עזרה?\n\nלחץ אישור כדי לשלוח לאבא את המיקום ולהתקשר אליו עכשיו.');if(!ok)return;const pos=await getEmergencyPosition();if(pos)await Promise.race([sendEmergencyLocation(pos),new Promise(resolve=>setTimeout(resolve,1200))]);window.location.href='tel:'+PARENT_PHONE;};
 
   function destinationFromScreen(){const text=((document.getElementById('message')?.textContent||'')+' '+(document.getElementById('title')?.textContent||'')).trim();if(text.includes('הביתה')||text.includes('הגעת הביתה'))return'הביתה';if(text.includes('בית הספר')||text.includes('רמון'))return'לבית הספר';return'ליעד';}
-  async function notifyArrivalFromScreen(){const tripScreen=document.getElementById('trip'),icon=document.getElementById('icon')?.textContent?.trim(),title=document.getElementById('title')?.textContent?.trim()||'',message=document.getElementById('message')?.textContent?.trim()||'',visible=tripScreen&&!tripScreen.classList.contains('hidden'),arrived=visible&&(icon==='🎉'||title.includes('הגעת')||message.includes('הגעת'));if(!arrived)return;const destination=destinationFromScreen(),key=`${destination}:${title}:${message}`;if(sentArrivals.has(key))return;const storageKey='simpleRouteArrivalScreen:'+key;if(sessionStorage.getItem(storageKey)==='sent')return;sentArrivals.add(key);sessionStorage.setItem(storageKey,'sent');await fetch('/api/push/arrival',{method:'POST',keepalive:true,headers:{'content-type':'application/json'},body:JSON.stringify({trip_id:`screen-${Date.now()}`,child:'מאור',destination})}).catch(()=>{});}
+
+  function updateRouteRun(){
+    const trip=document.getElementById('trip');
+    const visible=!!trip&&!trip.classList.contains('hidden');
+    if(visible&&!tripWasVisible){
+      routeRunId=(crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`);
+    }
+    if(!visible&&tripWasVisible){
+      routeRunId=null;
+    }
+    tripWasVisible=visible;
+    return visible;
+  }
+
+  async function notifyArrivalFromScreen(){
+    const tripScreen=document.getElementById('trip'),icon=document.getElementById('icon')?.textContent?.trim(),title=document.getElementById('title')?.textContent?.trim()||'',message=document.getElementById('message')?.textContent?.trim()||'',visible=tripScreen&&!tripScreen.classList.contains('hidden'),arrived=visible&&(icon==='🎉'||title.includes('הגעת')||message.includes('הגעת'));
+    if(!arrived||!routeRunId)return;
+    const destination=destinationFromScreen();
+    const key=routeRunId;
+    if(sentArrivals.has(key))return;
+    sentArrivals.add(key);
+    await fetch('/api/push/arrival',{method:'POST',keepalive:true,headers:{'content-type':'application/json'},body:JSON.stringify({trip_id:routeRunId,child:'מאור',destination})}).catch(()=>{});
+  }
+
   function cleanArrivalUi(){const trip=document.getElementById('trip');if(!trip||trip.classList.contains('hidden'))return;const icon=document.getElementById('icon'),title=document.getElementById('title'),message=document.getElementById('message');if(icon?.textContent?.trim()!=='🎉')return;const t=title?.textContent?.trim()||'',m=message?.textContent?.trim()||'';if(t&&m&&(t===m||(t.includes('הגעת')&&m.includes('הגעת'))))title.style.display='none';}
-  let lastArrivalSignature='';setInterval(()=>{try{cleanArrivalUi();const trip=document.getElementById('trip'),signature=trip&&!trip.classList.contains('hidden')?`${document.getElementById('icon')?.textContent||''}|${document.getElementById('title')?.textContent||''}|${document.getElementById('message')?.textContent||''}`:'';if(signature&&signature!==lastArrivalSignature){lastArrivalSignature=signature;notifyArrivalFromScreen();}if(!signature)lastArrivalSignature='';}catch(e){}},400);
+
+  let lastArrivalSignature='';
+  setInterval(()=>{
+    try{
+      const visible=updateRouteRun();
+      cleanArrivalUi();
+      const signature=visible?`${routeRunId}|${document.getElementById('icon')?.textContent||''}|${document.getElementById('title')?.textContent||''}|${document.getElementById('message')?.textContent||''}`:'';
+      if(signature&&signature!==lastArrivalSignature){lastArrivalSignature=signature;notifyArrivalFromScreen();}
+      if(!signature)lastArrivalSignature='';
+    }catch(e){}
+  },400);
 
   function bootUi(){[0,50,150,350,800,1500,3000].forEach(ms=>setTimeout(installParentButton,ms));}
   registerServiceWorker().catch(()=>{});
