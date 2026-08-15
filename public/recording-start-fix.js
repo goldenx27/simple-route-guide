@@ -1,6 +1,11 @@
 (()=>{
   let running=false;
 
+  function setUploadReady(ready){
+    const exportBtn=document.getElementById('exportButton');
+    if(exportBtn) exportBtn.disabled=!ready;
+  }
+
   function setUi(state){
     try{ setRecordingControls(state); }catch(e){}
     const record=document.getElementById('recordButton');
@@ -15,8 +20,17 @@
     try{ if(recTimer) clearInterval(recTimer); }catch(e){}
     recTimer=null;
     setUi('finished');
+
+    // parent-wizard uses the hidden legacy export button as its finished-state flag.
+    // Make that state explicit so the cloud upload button becomes available immediately.
+    setUploadReady(Array.isArray(recPoints) && recPoints.length>0);
+
     const status=document.getElementById('recStatus');
     if(status) status.textContent=`ההקלטה הסתיימה · ${recPoints.length} נקודות · ${recLandmarks.length} נקודות ציון`;
+
+    // Force the wizard's MutationObserver to repaint after the readiness flag is set.
+    const record=document.getElementById('recordButton');
+    if(record) record.setAttribute('data-recording-finished',String(Date.now()));
   }
 
   function startSafe(){
@@ -24,6 +38,7 @@
     if(!navigator.geolocation){ alert('GPS אינו זמין'); return; }
 
     running=true;
+    setUploadReady(false);
     recPoints=[];
     recLandmarks=[];
     pendingLandmark=null;
@@ -64,6 +79,7 @@
       if(recTimer) clearInterval(recTimer);
       recTimer=null;
       recWatch=null;
+      setUploadReady(false);
       setUi('idle');
       const s=document.getElementById('recStatus'); if(s) s.textContent='לא ניתן להפעיל GPS';
       return;
