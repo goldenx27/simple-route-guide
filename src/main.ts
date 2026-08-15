@@ -14,6 +14,20 @@ export default {
     if (url.pathname.startsWith('/api/push/')) {
       return handlePushApi(request, env);
     }
-    return app.fetch(request, env);
+
+    const response = await app.fetch(request, env);
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) return response;
+
+    const html = await response.text();
+    const injected = html.includes('/push-client.js')
+      ? html
+      : html.replace('</body>', '<script src="/push-client.js"></script></body>');
+
+    return new Response(injected, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   },
 };
