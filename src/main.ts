@@ -40,6 +40,9 @@ export default {
     if (!injected.includes('/bus-gps.js')) {
       injected = injected.replace('</body>', '<script src="/bus-gps.js"></script></body>');
     }
+    if (!injected.includes('/recovery-sync.js')) {
+      injected = injected.replace('</body>', '<script src="/recovery-sync.js"></script></body>');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
