@@ -58,6 +58,9 @@ export default {
     if (!injected.includes('/parent-wizard.js')) {
       injected = injected.replace('</body>', '<script src="/parent-wizard.js"></script></body>');
     }
+    if (!injected.includes('/recorder-state-sentinel.js')) {
+      injected = injected.replace('</body>', '<script src="/recorder-state-sentinel.js"></script></body>');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
