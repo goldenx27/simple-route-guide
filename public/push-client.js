@@ -34,15 +34,34 @@
   function paintPushButton() {
     const b=document.getElementById('parentPushButton'); if(!b)return;
     const on=localStorage.getItem('simpleRouteParentPush')==='on' && Notification?.permission==='granted';
-    b.textContent=on?'✅ התראות הורה פעילות בטלפון הזה':'🔔 הפעל התראות הורה בטלפון הזה'; b.className=on?'secondary':'primary';
+    b.textContent=on?'✅ התראות הורה פעילות בטלפון הזה':'🔔 הפעל התראות הורה בטלפון הזה';
+    b.className=(on?'secondary ':'primary ')+'parent-device-state';
+  }
+
+  function findParentStatusSection(recorder) {
+    return [...recorder.querySelectorAll('.parent-section')].find(section => section.querySelector('#routeDataState') || section.textContent?.includes('מצב נוכחי')) || null;
   }
 
   function installParentButton() {
-    const recorder=document.getElementById('recorder'); if(!recorder||document.getElementById('parentPushButton'))return;
-    const actions=recorder.querySelector('.actions'); if(!actions)return;
-    const b=document.createElement('button'); b.id='parentPushButton';b.type='button';b.onclick=subscribeParent;
-    const back=[...actions.querySelectorAll('button')].find(x=>x.textContent.includes('חזרה למסך מאור'));
-    if(back)actions.insertBefore(b,back);else actions.appendChild(b); paintPushButton();
+    const recorder=document.getElementById('recorder'); if(!recorder)return false;
+    let b=document.getElementById('parentPushButton');
+    if(!b){
+      b=document.createElement('button');
+      b.id='parentPushButton'; b.type='button'; b.onclick=subscribeParent;
+    }
+
+    const statusSection=findParentStatusSection(recorder);
+    const legacyActions=recorder.querySelector('.actions');
+    if(statusSection){
+      if(b.parentElement!==statusSection) statusSection.appendChild(b);
+    } else if(legacyActions){
+      const back=[...legacyActions.querySelectorAll('button')].find(x=>x.textContent.includes('חזרה למסך מאור'));
+      if(back)legacyActions.insertBefore(b,back);else legacyActions.appendChild(b);
+    } else if(!b.isConnected){
+      recorder.appendChild(b);
+    }
+    paintPushButton();
+    return true;
   }
 
   async function sendEmergencyLocation(position) {
@@ -63,7 +82,6 @@
     fetch('/api/push/arrival',{method:'POST',keepalive:true,headers:{'content-type':'application/json'},body:JSON.stringify({trip_id:trip.id,route_id:trip.route_id,child:'מאור',destination:data?.route_info?.destination?.name||''})}).catch(()=>{});
   }
 
-  // Observe the app's trip state without changing route/GPS behavior.
   let lastSeen='';
   setInterval(()=>{
     try{
@@ -74,6 +92,11 @@
     }catch(e){}
   },500);
 
+  function bootUi(){
+    installParentButton();
+    [50,150,350,800,1500].forEach(ms=>setTimeout(installParentButton,ms));
+  }
+
   registerServiceWorker().catch(()=>{});
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installParentButton);else installParentButton();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootUi);else bootUi();
 })();
