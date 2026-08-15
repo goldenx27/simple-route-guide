@@ -1,5 +1,5 @@
-const CACHE_NAME='simple-route-guide-v1';
-const APP_SHELL=['/','/manifest.json','/icons/app-icon.svg','/push-client.js'];
+const CACHE_NAME='simple-route-guide-v2';
+const APP_SHELL=['/','/manifest.json','/icons/app-icon.svg'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
@@ -25,7 +25,13 @@ self.addEventListener('fetch',event=>{
     }).catch(()=>caches.match('/')));
     return;
   }
-  if(['/manifest.json','/icons/app-icon.svg','/push-client.js'].includes(url.pathname)){
+  // Runtime JS must always come from the network so UI fixes are not trapped
+  // behind an old installed PWA cache. Other shell assets can stay cache-first.
+  if(url.pathname.endsWith('.js')){
+    event.respondWith(fetch(request,{cache:'no-store'}).catch(()=>caches.match(request)));
+    return;
+  }
+  if(['/manifest.json','/icons/app-icon.svg'].includes(url.pathname)){
     event.respondWith(caches.match(request).then(cached=>cached||fetch(request).then(response=>{
       const copy=response.clone();
       caches.open(CACHE_NAME).then(cache=>cache.put(request,copy));
