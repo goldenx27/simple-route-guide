@@ -55,6 +55,9 @@ export default {
     if (!injected.includes('/parent-ui-priority.js')) {
       injected = injected.replace('</body>', '<script src="/parent-ui-priority.js"></script></body>');
     }
+    if (!injected.includes('/parent-wizard.js')) {
+      injected = injected.replace('</body>', '<script src="/parent-wizard.js"></script></body>');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
