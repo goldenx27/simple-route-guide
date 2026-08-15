@@ -17,21 +17,58 @@
     .primary { background:#17202a; color:white; } .secondary { background:#e9eef3; color:#17202a; } .danger { background:#ffe6e6; color:#9c1c1c; }
     .alert { background:#fff1b8; border-radius:18px; padding:18px; font-size:1.35rem; font-weight:800; text-align:center; margin-top:16px; }
     .warning { background:#fff7df; border-radius:16px; padding:14px; font-size:.95rem; line-height:1.5; margin:14px 0; }
+    .bus-strip { border-radius:18px; padding:16px; margin:14px 0; background:#eef3f7; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .bus-strip .main { font-size:1.05rem; font-weight:800; }
+    .bus-strip .eta { font-size:1.35rem; font-weight:900; white-space:nowrap; }
+    .wake { text-align:center; font-size:.85rem; opacity:.65; margin:8px 0 2px; }
     .small { font-size:.9rem; opacity:.65; } .sim { border-top:1px solid #e8e8e8; margin-top:28px; padding-top:18px; } .hidden { display:none; }
   </style>
 </head>
 <body><div class="app">
-<div id="home"><h1>בוקר טוב מאור 👋</h1><p>לאן נוסעים?</p><div class="warning">המסלול לבית הספר כבר הוגדר: הרב מאיר אורבך 13 → קו 238 מתחנה 33734 → 7 תחנות → ירידה בתחנה 36743 → בית ספר רמון דרך שדרת העצים.</div><button class="primary" onclick="startTrip()">🏫 לבית הספר</button><button class="secondary" disabled>🏠 הביתה — בקרוב</button><button class="danger" onclick="sendHelp()">🆘 צריך עזרה</button></div>
-<div id="trip" class="hidden"><div class="status" id="routeName"></div><div class="card"><div class="icon" id="icon">🚶</div><h2 id="title"></h2><div class="message" id="message"></div><div class="sub" id="sub"></div><div id="alertBox" class="alert hidden"></div></div><button id="busButton" class="primary hidden" onclick="boardBus()">🚌 עליתי לקו 238</button><button class="danger" onclick="sendHelp()">🆘 צריך עזרה</button><div class="sim"><div class="small">מצב סימולציה לפיתוח</div><button class="secondary" onclick="simulateNext()">▶ הדגם את השלב הבא</button><button class="secondary" onclick="useGps()">📍 השתמש ב-GPS אמיתי</button><div class="small">GPS אמיתי יופעל לאחר כיול נקודות ההליכה והקיצור בשטח.</div></div></div>
+<div id="home">
+  <h1>בוקר טוב מאור 👋</h1>
+  <p>לאן נוסעים?</p>
+  <div class="warning">המסלול לבית הספר: הרב מאיר אורבך 13 → קו 238 מתחנה 33734 → 7 תחנות → ירידה בתחנה 36743 → בית ספר רמון דרך שדרת העצים.</div>
+  <div class="bus-strip">
+    <div>
+      <div class="main">🚌 קו 238 · תחנה 33734</div>
+      <div class="small" id="homeEtaStatus">בודק זמן הגעה…</div>
+    </div>
+    <div class="eta" id="homeEta">—</div>
+  </div>
+  <button class="primary" onclick="startTrip()">🏫 לבית הספר</button>
+  <button class="secondary" disabled>🏠 הביתה — בקרוב</button>
+  <button class="danger" onclick="sendHelp()">🆘 צריך עזרה</button>
+</div>
+<div id="trip" class="hidden">
+  <div class="status" id="routeName"></div>
+  <div class="bus-strip">
+    <div>
+      <div class="main">🚌 קו 238 לתחנה 33734</div>
+      <div class="small" id="tripEtaStatus">מתעדכן אוטומטית</div>
+    </div>
+    <div class="eta" id="tripEta">—</div>
+  </div>
+  <div class="wake" id="wakeStatus">מנסה להשאיר את המסך פעיל…</div>
+  <div class="card"><div class="icon" id="icon">🚶</div><h2 id="title"></h2><div class="message" id="message"></div><div class="sub" id="sub"></div><div id="alertBox" class="alert hidden"></div></div>
+  <button id="busButton" class="primary hidden" onclick="boardBus()">🚌 עליתי לקו 238</button>
+  <button class="danger" onclick="sendHelp()">🆘 צריך עזרה</button>
+  <div class="sim"><div class="small">מצב סימולציה לפיתוח</div><button class="secondary" onclick="simulateNext()">▶ הדגם את השלב הבא</button><button class="secondary" onclick="useGps()">📍 השתמש ב-GPS אמיתי</button><div class="small">GPS אמיתי יופעל לאחר כיול נקודות ההליכה והקיצור בשטח.</div></div>
+</div>
 </div><script>
-let tripId=null,current=null;const icons={walk:'🚶',wait_for_bus:'🚏',bus:'🚌',arrival:'🎉'};
+let tripId=null,current=null,wakeLock=null,etaTimer=null;const icons={walk:'🚶',wait_for_bus:'🚏',bus:'🚌',arrival:'🎉'};
 const el=id=>document.getElementById(id);
 async function api(path,options={}){const res=await fetch(path,{headers:{'Content-Type':'application/json'},...options});const data=await res.json();if(!res.ok)throw new Error(data.detail||'שגיאה');return data;}
-async function startTrip(){try{current=await api('/api/trips/start/maor-home-school',{method:'POST'});tripId=current.trip.id;el('home').classList.add('hidden');el('trip').classList.remove('hidden');render(current);speak(current.message);}catch(e){window.alert(e.message)}}
+async function refreshEta(){try{const data=await api('/api/transit/arrival');const etaText=typeof data.eta_minutes==='number'?`${data.eta_minutes} דק׳`:'—';const status=data.realtime_connected?`עודכן עכשיו · ${data.stop_name}`:data.message;el('homeEta').textContent=etaText;el('tripEta').textContent=etaText;el('homeEtaStatus').textContent=status;el('tripEtaStatus').textContent=status;}catch(e){el('homeEtaStatus').textContent='אין כרגע נתוני זמן אמת';el('tripEtaStatus').textContent='אין כרגע נתוני זמן אמת';}}
+function startEtaPolling(){refreshEta();if(etaTimer)clearInterval(etaTimer);etaTimer=setInterval(refreshEta,20000);}
+async function requestWakeLock(){if(!tripId)return;try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');el('wakeStatus').textContent='🔆 המסך יישאר פעיל בזמן המסלול';wakeLock.addEventListener('release',()=>{el('wakeStatus').textContent='המסך יכול להיכבות אם האפליקציה ברקע';});}else{el('wakeStatus').textContent='המכשיר לא תומך במניעת כיבוי מסך דרך הדפדפן';}}catch(e){el('wakeStatus').textContent='לא הצלחתי למנוע כיבוי מסך';}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&tripId&&!wakeLock)requestWakeLock();});
+async function startTrip(){try{current=await api('/api/trips/start/maor-home-school',{method:'POST'});tripId=current.trip.id;el('home').classList.add('hidden');el('trip').classList.remove('hidden');render(current);speak(current.message);await requestWakeLock();startEtaPolling();}catch(e){window.alert(e.message)}}
 function render(data){current=data;const step=data.step;el('routeName').textContent=data.route_name;el('icon').textContent=icons[step.type]||'📍';el('title').textContent=step.title;el('message').textContent=data.message||step.instruction;const details=[];if(step.bus_line)details.push(`קו ${step.bus_line}`);if(step.stop_id)details.push(`תחנה ${step.stop_id}`);if(step.address)details.push(step.address);el('sub').textContent=details.join(' · ');const box=el('alertBox');if(data.alert){box.textContent=data.alert;box.classList.remove('hidden');navigator.vibrate?.([250,120,250]);speak(data.alert)}else box.classList.add('hidden');el('busButton').classList.toggle('hidden',step.type!=='wait_for_bus');}
 function speak(text){if(!text||!('speechSynthesis' in window))return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='he-IL';speechSynthesis.speak(u);}
 async function boardBus(){try{render(await api(`/api/trips/${tripId}/board-bus`,{method:'POST'}));}catch(e){window.alert(e.message)}}
 async function simulateNext(){if(!current||!tripId)return;try{render(await api(`/api/trips/${tripId}/simulate-next`,{method:'POST'}));}catch(e){window.alert(e.message)}}
 function useGps(){if(!tripId)return;api(`/api/trips/${tripId}/location`,{method:'POST',body:JSON.stringify({lat:0,lon:0})}).catch(e=>window.alert(e.message));}
 async function sendHelp(){if(!tripId){window.alert('🆘 לאחר שנחבר את צד ההורה, הכפתור ישלח מיקום ויאפשר התקשרות.');return}try{render(await api(`/api/trips/${tripId}/help`,{method:'POST'}));}catch(e){window.alert(e.message)}}
+startEtaPolling();
 </script></body></html>
