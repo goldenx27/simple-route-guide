@@ -1,0 +1,21 @@
+{
+  "name": "הדרך של מאור",
+  "short_name": "הדרך של מאור",
+  "description": "אפליקציית עזר למסלול של מאור לבית הספר ובחזרה",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#17202a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
