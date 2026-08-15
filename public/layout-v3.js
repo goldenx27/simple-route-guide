@@ -5,12 +5,12 @@
     style.id = 'layoutV3Styles';
     style.textContent = `
       .app{padding:12px 14px}.screen{gap:8px}
-      .top-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;min-height:50px}
-      .top-panel h1{margin:0;font-size:1.85rem;line-height:1.1;white-space:nowrap}
+      .top-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;min-height:50px;height:50px}
+      .top-panel h1{margin:0;font-size:1.85rem;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .top-controls{display:flex;align-items:center;gap:8px;direction:ltr}
       .top-icon-button{position:static!important;width:46px!important;height:46px!important;min-width:46px;padding:0!important;border-radius:50%!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:1.45rem!important;line-height:1!important;background:#eef3f7!important;color:#17202a!important;box-shadow:0 3px 10px rgba(0,0,0,.08)!important}
-      .route-action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
-      .route-action-row button,#home .route-buttons button{min-height:74px;font-size:1.18rem;border-radius:20px}
+      .route-action-row,#home .route-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px;height:74px}
+      .route-action-row button,#home .route-buttons button{height:74px;min-height:74px;font-size:1.18rem;border-radius:20px}
       #home .top,#trip .top{display:block;position:relative}
       #home #routePreview{display:none!important}
       #home .bus-strip,#tripTransit{margin-top:10px;height:104px;min-height:104px;border-radius:20px;padding:16px;flex-shrink:0}
@@ -30,8 +30,9 @@
       #trip .actions{display:none!important}
       #trip #busButton.trip-inline-bus{display:block!important;margin-top:10px;min-height:50px}
       #trip #busButton.trip-inline-bus.hidden{display:none!important}
-      #wakeStatus{font-size:.7rem}
-      @media(max-height:760px){#home .route-buttons button,.route-action-row button{min-height:64px}#home .bus-strip,#tripTransit{height:96px;min-height:96px;padding:12px}#trip .landmark-feedback img{max-height:29vh!important;min-height:160px}#trip .message{font-size:1.16rem}#trip .card{padding:11px 15px}}
+      #wakeStatus{display:none!important}
+      #routeName{display:none!important}
+      @media(max-height:760px){.top-panel{height:46px;min-height:46px}#home .route-buttons,.route-action-row{height:64px}#home .route-buttons button,.route-action-row button{height:64px;min-height:64px}#home .bus-strip,#tripTransit{height:96px;min-height:96px;padding:12px}#trip .landmark-feedback img{max-height:29vh!important;min-height:160px}#trip .message{font-size:1.16rem}#trip .card{padding:11px 15px}}
       @media(max-width:380px){.top-panel h1{font-size:1.65rem}.top-icon-button{width:42px!important;height:42px!important;min-width:42px;font-size:1.32rem!important}#trip .landmark-feedback img{min-height:165px}}
     `;
     document.head.appendChild(style);
