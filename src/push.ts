@@ -13,18 +13,15 @@ type StoredSubscription = {
   keys: { p256dh: string; auth: string };
 };
 
-const REQUIRED_SEGMENTS = new Set([
-  'home-to-38283',
-  '38252-to-school',
-  'school-to-36743',
-  '33734-to-home',
-]);
-
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8' },
   });
+}
+
+function validSegment(segment: string) {
+  return /^[a-zA-Z0-9_-]{1,120}$/.test(segment);
 }
 
 export class PushStore {
@@ -50,7 +47,7 @@ export class PushStore {
     if (url.pathname === '/routes' && request.method === 'GET') {
       const stored = await this.state.storage.list<any>({ prefix: 'route:' });
       const recordings = [...stored.values()]
-        .filter(x => x && REQUIRED_SEGMENTS.has(x.segment))
+        .filter(x => x && typeof x.segment === 'string' && validSegment(x.segment))
         .sort((a, b) => String(a.segment).localeCompare(String(b.segment)));
       return json({ recordings, count: recordings.length });
     }
@@ -58,7 +55,7 @@ export class PushStore {
     const routeMatch = url.pathname.match(/^\/routes\/([^/]+)$/);
     if (routeMatch && request.method === 'POST') {
       const segment = decodeURIComponent(routeMatch[1]);
-      if (!REQUIRED_SEGMENTS.has(segment)) return json({ detail: 'Invalid route segment' }, 400);
+      if (!validSegment(segment)) return json({ detail: 'Invalid route segment' }, 400);
 
       const body = await request.json<any>();
       if (body?.segment !== segment || !Array.isArray(body?.points) || !Array.isArray(body?.landmarks)) {
@@ -66,11 +63,9 @@ export class PushStore {
       }
 
       const key = `route:${segment}`;
-      const existing = await this.state.storage.get<any>(key);
-      if (existing) return json({ ok: true, stored: false, reason: 'already_exists', segment });
-
-      await this.state.storage.put(key, body);
-      return json({ ok: true, stored: true, segment });
+      const existed = !!(await this.state.storage.get<any>(key));
+      await this.state.storage.put(key, { ...body, updatedAt: new Date().toISOString() });
+      return json({ ok: true, stored: true, overwritten: existed, segment });
     }
 
     if (url.pathname === '/send' && request.method === 'POST') {
@@ -82,6 +77,7 @@ export class PushStore {
         this.env.VAPID_SUBJECT,
         this.env.VAPID_PUBLIC_KEY,
         this.env.VAPID_PRIVATE_KEY,
+        this.env.VAPID_SUBJECT,
       );
 
       let delivered = 0;
