@@ -1,5 +1,4 @@
 (()=>{
-  const REQUIRED=['home-to-38283','38252-to-school','school-to-36743','33734-to-home'];
   const DB_NAME='simple-route-guide';
   const STORE='routes';
   const RELOAD_KEY='routeCloudSyncReloaded';
@@ -30,16 +29,16 @@
   async function putLocal(rows){
     if(!rows.length)return 0;
     const db=await openDb();
-    let added=0;
+    let count=0;
     try{
       await new Promise((resolve,reject)=>{
         const tx=db.transaction(STORE,'readwrite');
         const store=tx.objectStore(STORE);
-        for(const row of rows){store.put(row);added++}
+        for(const row of rows){if(row?.segment){store.put(row);count++}}
         tx.oncomplete=resolve;
         tx.onerror=()=>reject(tx.error);
       });
-      return added;
+      return count;
     }finally{db.close()}
   }
 
@@ -50,22 +49,29 @@
     return Array.isArray(data.recordings)?data.recordings:[];
   }
 
-  async function uploadMissing(local,cloud){
-    const cloudSegments=new Set(cloud.map(x=>x.segment));
-    let uploaded=0;
-    for(const row of local){
-      if(!REQUIRED.includes(row?.segment)||cloudSegments.has(row.segment))continue;
-      const r=await fetch('/api/route-recordings/'+encodeURIComponent(row.segment),{
-        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(row)
-      });
-      if(r.ok)uploaded++;
-    }
-    return uploaded;
+  async function upload(row){
+    if(!row?.segment)return false;
+    const r=await fetch('/api/route-recordings/'+encodeURIComponent(row.segment),{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(row)
+    });
+    return r.ok;
   }
 
-  function paint(text){
+  function configuredSegments(){
+    const select=document.getElementById('segmentSelect');
+    return new Set([...(select?.options||[])].map(o=>o.value).filter(Boolean));
+  }
+
+  function paint(cloud){
     const node=document.getElementById('routeDataState');
-    if(node)node.textContent=text;
+    if(!node)return;
+    const configured=configuredSegments();
+    const covered=configured.size
+      ? cloud.filter(x=>configured.has(x?.segment)).length
+      : cloud.length;
+    node.textContent=configured.size
+      ? `☁️ ${covered}/${configured.size} מקטעים מכוסים בענן`
+      : `☁️ ${cloud.length} מקטעים שמורים בענן`;
   }
 
   async function sync(){
@@ -73,18 +79,18 @@
     try{
       const local=await getLocal();
       let cloud=await fetchCloud();
-      const uploaded=await uploadMissing(local,cloud);
-      if(uploaded)cloud=await fetchCloud();
 
-      const localSegments=new Set(local.map(x=>x.segment));
-      const missing=cloud.filter(x=>REQUIRED.includes(x?.segment)&&!localSegments.has(x.segment));
-      const added=await putLocal(missing);
-      const finalCount=new Set([...local.map(x=>x.segment),...cloud.map(x=>x.segment)]).size;
+      // One-time migration path: if the cloud is completely empty but this device
+      // already has recordings, bootstrap them. Afterwards the cloud is authoritative.
+      if(!cloud.length && local.length){
+        for(const row of local)await upload(row);
+        cloud=await fetchCloud();
+      }
 
-      if(finalCount>=4)paint('☁️ 4/4 מקטעים מסונכרנים מהענן');
-      else if(uploaded)paint(`☁️ הועלו ${uploaded} מקטעים לענן · ${finalCount}/4`);
+      const written=await putLocal(cloud);
+      paint(cloud);
 
-      if(added>0){
+      if(written>0){
         if(sessionStorage.getItem(RELOAD_KEY)!=='1'){
           sessionStorage.setItem(RELOAD_KEY,'1');
           location.reload();
@@ -98,5 +104,6 @@
     }
   }
 
+  window.refreshRouteCloudSync=sync;
   sync();
 })();
