@@ -8,16 +8,10 @@
 
   function endpointConfig() {
     if (selectedRoute === 'maor-home-school') {
-      return {
-        start: routeRecordings['home-to-38283'],
-        end: routeRecordings['38252-to-school'],
-      };
+      return { start: routeRecordings['home-to-38283'], end: routeRecordings['38252-to-school'] };
     }
     if (selectedRoute === 'maor-school-home') {
-      return {
-        start: routeRecordings['school-to-36743'],
-        end: routeRecordings['33734-to-home'],
-      };
+      return { start: routeRecordings['school-to-36743'], end: routeRecordings['33734-to-home'] };
     }
     return null;
   }
@@ -33,19 +27,15 @@
     if (!cfg) return null;
     const start = edgePoint(cfg.start, 'end');
     const end = edgePoint(cfg.end, 'start');
-    if (!start || !end) return null;
-    if (distanceMeters(start, end) < 250) return null;
+    if (!start || !end || distanceMeters(start, end) < 250) return null;
     return { start, end };
   }
 
   function projectedProgress(here, start, end) {
     const lat0 = ((start.lat + end.lat) / 2) * Math.PI / 180;
-    const kx = 111320 * Math.cos(lat0);
-    const ky = 110540;
-    const vx = (end.lon - start.lon) * kx;
-    const vy = (end.lat - start.lat) * ky;
-    const wx = (here.lon - start.lon) * kx;
-    const wy = (here.lat - start.lat) * ky;
+    const kx = 111320 * Math.cos(lat0), ky = 110540;
+    const vx = (end.lon - start.lon) * kx, vy = (end.lat - start.lat) * ky;
+    const wx = (here.lon - start.lon) * kx, wy = (here.lat - start.lat) * ky;
     const denom = vx * vx + vy * vy;
     if (!denom) return 0;
     return Math.max(0, Math.min(1.05, (wx * vx + wy * vy) / denom));
@@ -63,82 +53,52 @@
     if (!tripId || updating) return;
     updating = true;
     try {
-      const d = await api(`/api/trips/${tripId}/bus-progress`, {
-        method: 'POST',
-        body: JSON.stringify({ remaining_stops: remaining }),
-      });
-      render(d);
-      paintBusGpsStatus();
-      if (d.alert) {
-        navigator.vibrate?.([350, 150, 350, 150, 600]);
-      } else if (d.step?.type === 'walk') {
-        navigator.vibrate?.([500, 180, 500]);
-        speak(d.message || d.step?.instruction);
-        stopBusGpsTracker();
+      const d = await api(`/api/trips/${tripId}/bus-progress`, { method: 'POST', body: JSON.stringify({ remaining_stops: remaining }) });
+      render(d); paintBusGpsStatus();
+      if (d.alert) navigator.vibrate?.([350,150,350,150,600]);
+      else if (d.step?.type === 'walk') {
+        navigator.vibrate?.([500,180,500]); speak(d.message || d.step?.instruction); stopBusGpsTracker();
       }
-    } catch (e) {
-      console.warn('bus GPS progress update failed', e);
-    } finally {
-      updating = false;
-    }
+    } catch (e) { console.warn('bus GPS progress update failed', e); }
+    finally { updating = false; }
   }
 
   async function evaluateBusPosition(pos) {
-    if (!current || current.step?.type !== 'bus') return;
-    if ((pos.coords.accuracy || 999) > 60) return;
-    const endpoints = busEndpoints();
-    if (!endpoints) return;
-
+    if (!current || current.step?.type !== 'bus' || (pos.coords.accuracy || 999) > 60) return;
+    const endpoints = busEndpoints(); if (!endpoints) return;
     const here = { lat: pos.coords.latitude, lon: pos.coords.longitude };
     let progress = projectedProgress(here, endpoints.start, endpoints.end);
     const distanceToEnd = distanceMeters(here, endpoints.end);
-
-    // Never move backwards because of GPS jitter.
-    progress = Math.max(lastProgress, progress);
-    lastProgress = progress;
-
+    progress = Math.max(lastProgress, progress); lastProgress = progress;
     let candidate = passedStops;
     for (let i = passedStops; i < PASS_THRESHOLDS.length; i++) {
-      if (progress >= PASS_THRESHOLDS[i]) candidate = i + 1;
-      else break;
+      if (progress >= PASS_THRESHOLDS[i]) candidate = i + 1; else break;
     }
-
-    // Final arrival is confirmed by physical proximity to the recorded exit stop.
-    if (distanceToEnd <= Math.max(55, (pos.coords.accuracy || 15) + 25) && progress >= 0.82) {
-      candidate = TOTAL_STOPS;
-    }
-
-    if (candidate <= passedStops) {
-      paintBusGpsStatus();
-      return;
-    }
-
+    if (distanceToEnd <= Math.max(55, (pos.coords.accuracy || 15) + 25) && progress >= 0.82) candidate = TOTAL_STOPS;
+    if (candidate <= passedStops) { paintBusGpsStatus(); return; }
     passedStops = candidate;
-    const remaining = Math.max(0, TOTAL_STOPS - passedStops);
-    await pushRemaining(remaining);
+    await pushRemaining(Math.max(0, TOTAL_STOPS - passedStops));
   }
 
-  function startBusGpsTracker() {
+  function startBusGpsTracker(initialPassed = 0) {
     stopBusGpsTracker();
-    passedStops = 0;
-    lastProgress = 0;
+    passedStops = Math.max(0, Math.min(TOTAL_STOPS, Number(initialPassed) || 0));
+    lastProgress = passedStops ? PASS_THRESHOLDS[Math.max(0, passedStops - 1)] : 0;
     if (!navigator.geolocation || !busEndpoints()) {
       const sub = document.getElementById('sub');
       if (sub && current?.step?.type === 'bus') sub.textContent = 'GPS · ממתין לנתוני ארבע ההקלטות';
       return;
     }
     paintBusGpsStatus();
-    busWatch = navigator.geolocation.watchPosition(
-      evaluateBusPosition,
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 1500, timeout: 15000 },
-    );
+    busWatch = navigator.geolocation.watchPosition(evaluateBusPosition, () => {}, { enableHighAccuracy: true, maximumAge: 1500, timeout: 15000 });
   }
 
-  function stopBusGpsTracker() {
-    if (busWatch != null) navigator.geolocation.clearWatch(busWatch);
-    busWatch = null;
-  }
+  function stopBusGpsTracker() { if (busWatch != null) navigator.geolocation.clearWatch(busWatch); busWatch = null; }
+
+  window.startBusGpsTracker = startBusGpsTracker;
+  window.stopBusGpsTracker = stopBusGpsTracker;
+  window.busGpsEndpoints = busEndpoints;
+  window.busProjectedProgress = projectedProgress;
 
   const originalBoardBus = window.boardBus;
   window.boardBus = async function (...args) {
@@ -148,8 +108,6 @@
   };
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && current?.step?.type === 'bus' && busWatch == null) {
-      startBusGpsTracker();
-    }
+    if (document.visibilityState === 'visible' && current?.step?.type === 'bus' && busWatch == null) startBusGpsTracker();
   });
 })();
