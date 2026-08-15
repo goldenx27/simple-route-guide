@@ -6,20 +6,20 @@
     style.textContent = `
       .sound-icon-button{position:absolute;top:8px;left:8px;width:48px;height:48px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.55rem;line-height:1;background:#eef3f7;color:#17202a;z-index:12;box-shadow:0 3px 12px rgba(0,0,0,.10)}
       #home>.top,#trip>.top{position:relative}
-      .landmark-feedback{width:154px!important}
-      .landmark-feedback img{width:138px!important;height:122px!important}
-      @media(max-width:380px){.landmark-feedback{width:138px!important}.landmark-feedback img{width:122px!important;height:108px!important}}
     `;
     document.head.appendChild(style);
   }
 
-  function iconText() { return window.soundEnabled === false ? '🔇' : '🔊'; }
+  function soundButtons() {
+    return [document.getElementById('homeSoundIconButton'), document.getElementById('tripSoundIconButton')].filter(Boolean);
+  }
 
   function paintIcons() {
-    document.querySelectorAll('.sound-icon-button').forEach(b => {
+    soundButtons().forEach(b => {
       b.textContent = soundEnabled ? '🔊' : '🔇';
       b.setAttribute('aria-label', soundEnabled ? 'השתק קול' : 'הפעל קול');
       b.title = soundEnabled ? 'השתק קול' : 'הפעל קול';
+      b.setAttribute('aria-pressed', soundEnabled ? 'false' : 'true');
     });
   }
 
@@ -29,7 +29,11 @@
     b.id = id;
     b.type = 'button';
     b.className = 'sound-icon-button';
-    b.onclick = () => { toggleSound(); paintIcons(); };
+    b.dataset.soundControl = '1';
+    b.onclick = () => {
+      toggleSound();
+      requestAnimationFrame(paintIcons);
+    };
     parent.appendChild(b);
   }
 
@@ -45,11 +49,12 @@
   if (typeof originalToggle === 'function') {
     window.toggleSound = function (...args) {
       const result = originalToggle.apply(this, args);
-      paintIcons();
+      requestAnimationFrame(paintIcons);
       return result;
     };
   }
 
+  window.paintSoundIcons = paintIcons;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
   else install();
 })();
