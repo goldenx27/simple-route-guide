@@ -24,6 +24,10 @@ function validSegment(segment: string) {
   return /^[a-zA-Z0-9_-]{1,120}$/.test(segment);
 }
 
+function routePrefix(testMode = false) {
+  return testMode ? 'route-test:' : 'route:';
+}
+
 export class PushStore {
   constructor(private state: DurableObjectState, private env: PushEnv) {}
 
@@ -44,17 +48,19 @@ export class PushStore {
       return json({ subscriptions: subs.size });
     }
 
-    if (url.pathname === '/routes' && request.method === 'GET') {
-      const stored = await this.state.storage.list<any>({ prefix: 'route:' });
+    if ((url.pathname === '/routes' || url.pathname === '/routes-test') && request.method === 'GET') {
+      const testMode = url.pathname === '/routes-test';
+      const stored = await this.state.storage.list<any>({ prefix: routePrefix(testMode) });
       const recordings = [...stored.values()]
         .filter(x => x && typeof x.segment === 'string' && validSegment(x.segment))
         .sort((a, b) => String(a.segment).localeCompare(String(b.segment)));
-      return json({ recordings, count: recordings.length });
+      return json({ recordings, count: recordings.length, testMode });
     }
 
-    const routeMatch = url.pathname.match(/^\/routes\/([^/]+)$/);
+    const routeMatch = url.pathname.match(/^\/(routes|routes-test)\/([^/]+)$/);
     if (routeMatch && request.method === 'POST') {
-      const segment = decodeURIComponent(routeMatch[1]);
+      const testMode = routeMatch[1] === 'routes-test';
+      const segment = decodeURIComponent(routeMatch[2]);
       if (!validSegment(segment)) return json({ detail: 'Invalid route segment' }, 400);
 
       const body = await request.json<any>();
@@ -62,10 +68,16 @@ export class PushStore {
         return json({ detail: 'Invalid route recording' }, 400);
       }
 
-      const key = `route:${segment}`;
+      const key = `${routePrefix(testMode)}${segment}`;
       const existed = !!(await this.state.storage.get<any>(key));
-      await this.state.storage.put(key, { ...body, updatedAt: new Date().toISOString() });
-      return json({ ok: true, stored: true, overwritten: existed, segment });
+      await this.state.storage.put(key, { ...body, updatedAt: new Date().toISOString(), testMode });
+      return json({ ok: true, stored: true, overwritten: existed, segment, testMode });
+    }
+
+    if (url.pathname === '/routes-test' && request.method === 'DELETE') {
+      const stored = await this.state.storage.list<any>({ prefix: routePrefix(true) });
+      await Promise.all([...stored.keys()].map(key => this.state.storage.delete(key)));
+      return json({ ok: true, deleted: stored.size, testMode: true });
     }
 
     if (url.pathname === '/send' && request.method === 'POST') {
@@ -110,6 +122,21 @@ export async function handlePushApi(request: Request, env: PushEnv): Promise<Res
 
   if (url.pathname === '/api/route-recordings' && request.method === 'GET') {
     return parentStub(env).fetch('https://push.internal/routes');
+  }
+  if (url.pathname === '/api/route-recordings/test' && request.method === 'GET') {
+    return parentStub(env).fetch('https://push.internal/routes-test');
+  }
+  if (url.pathname === '/api/route-recordings/test' && request.method === 'DELETE') {
+    return parentStub(env).fetch('https://push.internal/routes-test', { method: 'DELETE' });
+  }
+
+  const testRouteMatch = url.pathname.match(/^\/api\/route-recordings\/test\/([^/]+)$/);
+  if (testRouteMatch && request.method === 'POST') {
+    const segment = decodeURIComponent(testRouteMatch[1]);
+    const body = await request.text();
+    return parentStub(env).fetch(`https://push.internal/routes-test/${encodeURIComponent(segment)}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body,
+    });
   }
 
   const routeRecordingMatch = url.pathname.match(/^\/api\/route-recordings\/([^/]+)$/);
