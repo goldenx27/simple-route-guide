@@ -183,6 +183,19 @@ async function handleApi(request: Request, env: Env) {
     return json({ ok: true, runtime: 'cloudflare-worker', d1_connected: Boolean(env.DB), gps_route_verified: GPS_ROUTE_VERIFIED });
   }
 
+  if (path === '/api/transit/arrival' && request.method === 'GET') {
+    return json({
+      line: '238',
+      stop_id: '33734',
+      stop_name: 'היכל התרבות/המכבים',
+      realtime_connected: false,
+      eta_minutes: null,
+      status: 'awaiting_siri_connection',
+      message: 'זמן אמת יופעל לאחר חיבור מקור SIRI של משרד התחבורה',
+      updated_at: new Date().toISOString()
+    });
+  }
+
   if (path === `/api/routes/${ROUTE_ID}` && request.method === 'GET') {
     return json({ route_name: ROUTE_NAME, route_info: routeInfo, gps_route_verified: GPS_ROUTE_VERIFIED, steps });
   }
