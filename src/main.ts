@@ -8,6 +8,16 @@ type Env = PushEnv & {
   DB?: D1Database;
 };
 
+const PWA_HEAD = [
+  '<link rel="manifest" href="/manifest.json">',
+  '<link rel="icon" href="/icons/app-icon.svg" type="image/svg+xml">',
+  '<meta name="application-name" content="הדרך של מאור">',
+  '<meta name="mobile-web-app-capable" content="yes">',
+  '<meta name="apple-mobile-web-app-capable" content="yes">',
+  '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
+  '<meta name="apple-mobile-web-app-title" content="הדרך של מאור">',
+].join('');
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -20,14 +30,22 @@ export default {
     if (!contentType.includes('text/html')) return response;
 
     const html = await response.text();
-    const injected = html.includes('/push-client.js')
-      ? html
-      : html.replace('</body>', '<script src="/push-client.js"></script></body>');
+    let injected = html;
+    if (!injected.includes('rel="manifest"')) {
+      injected = injected.replace('</head>', `${PWA_HEAD}</head>`);
+    }
+    if (!injected.includes('/push-client.js')) {
+      injected = injected.replace('</body>', '<script src="/push-client.js"></script></body>');
+    }
+
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    headers.set('cache-control', 'no-cache');
 
     return new Response(injected, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers,
+      headers,
     });
   },
 };
