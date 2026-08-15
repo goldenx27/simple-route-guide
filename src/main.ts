@@ -73,6 +73,9 @@ export default {
     if (!injected.includes('/remove-legacy-route-loader.js')) {
       injected = injected.replace('</body>', '<script src="/remove-legacy-route-loader.js"></script></body>');
     }
+    if (!injected.includes('/remove-legacy-clear-recording.js')) {
+      injected = injected.replace('</body>', '<script src="/remove-legacy-clear-recording.js"></script></body>');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
