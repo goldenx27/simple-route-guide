@@ -91,18 +91,37 @@
     paintSegmentContext(); refreshState();
   }
 
+  function resetRecordingDraft() {
+    // Clear only the in-progress recorder state. Saved route recordings remain untouched.
+    if (typeof window.clearRecording === 'function') {
+      window.clearRecording();
+      return;
+    }
+    const clearBtn = document.getElementById('clearRecordingButton');
+    if (clearBtn && !clearBtn.disabled) clearBtn.click();
+  }
+
   function goNextSegment() {
     const select = document.getElementById('segmentSelect');
     if (!select) return;
     const i = segmentIndex();
     if (i >= SEGMENTS.length - 1) { window.closeRecorder?.(); return; }
+
+    // The previous segment is already finished/saved. Reset its temporary points,
+    // landmarks, photos and counters BEFORE switching to the next segment.
+    resetRecordingDraft();
+
     select.value = SEGMENTS[i + 1].value;
     select.dispatchEvent(new Event('change', { bubbles:true }));
     setStep(2);
     setTimeout(() => {
       const status = document.getElementById('recStatus');
       if (status) status.textContent = `מוכן להקלטת ${SEGMENTS[i+1].label}`;
+      const points = document.getElementById('recPoints'); if (points) points.textContent = '0';
+      const time = document.getElementById('recTime'); if (time) time.textContent = '00:00';
+      const accuracy = document.getElementById('recAccuracy'); if (accuracy) accuracy.textContent = '—';
       document.getElementById('recordButton')?.scrollIntoView({ behavior:'smooth', block:'center' });
+      refreshState();
     }, 50);
   }
 
