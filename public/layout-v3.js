@@ -38,14 +38,16 @@
   }
 
   function makeParentButton(id){const b=document.createElement('button');b.id=id;b.type='button';b.className='top-icon-button';b.textContent='⚙️';b.setAttribute('aria-label','מצב הורה');b.title='מצב הורה';b.onclick=()=>openRecorder();return b}
-  function normalizeSoundButton(button){if(!button)return;button.classList.add('top-icon-button');button.classList.remove('sound-icon-button')}
+  function normalizeSoundButton(button){if(!button)return;button.classList.add('top-icon-button');button.dataset.soundControl='1'}
 
   function makeHeader(screenId,soundId,parentId){
     const top=document.querySelector(`#${screenId} .top`);if(!top)return;
-    let panel=document.getElementById(`${screenId}TopPanel`);
-    if(panel)return;
-    panel=document.createElement('div');panel.id=`${screenId}TopPanel`;panel.className='top-panel';
-    const h=document.createElement('h1');h.textContent='היי מאור 👋';
+    if(document.getElementById(`${screenId}TopPanel`))return;
+    const existingHeadings=[...top.querySelectorAll('h1')];
+    const h=existingHeadings.shift()||document.createElement('h1');
+    h.textContent='היי מאור 👋';
+    existingHeadings.forEach(x=>x.remove());
+    const panel=document.createElement('div');panel.id=`${screenId}TopPanel`;panel.className='top-panel';
     const controls=document.createElement('div');controls.className='top-controls';controls.appendChild(makeParentButton(parentId));
     const sound=document.getElementById(soundId);if(sound){normalizeSoundButton(sound);controls.appendChild(sound)}
     panel.appendChild(h);panel.appendChild(controls);top.insertBefore(panel,top.firstChild);
@@ -63,11 +65,8 @@
   }
 
   function placeTripBusPanel(){const top=document.querySelector('#trip .top'),row=document.getElementById('tripActionRow'),strip=document.getElementById('tripTransit');if(top&&row&&strip&&strip.parentElement!==top)row.insertAdjacentElement('afterend',strip)}
-
   function moveBusButtonIntoCard(){const b=document.getElementById('busButton'),card=document.querySelector('#trip .card');if(!b||!card)return;b.classList.add('trip-inline-bus');if(b.parentElement!==card)card.appendChild(b)}
-
   function cleanLegacyButtons(){document.querySelector('#home .actions .danger')?.remove();document.querySelector('#home .actions .ghost')?.remove();document.getElementById('backToHomeButton')?.remove();document.querySelector('#trip .actions>.danger')?.remove()}
-
   function syncEtaVisibility(){const strip=document.querySelector('#home .bus-strip');if(strip)strip.classList.toggle('route-not-selected',!selectedRoute)}
   function startHomeEtaPolling(){if(!selectedRoute)return;refreshEta();if(etaTimer)clearInterval(etaTimer);etaTimer=setInterval(()=>{if(!tripId&&selectedRoute)refreshEta()},20000)}
 
