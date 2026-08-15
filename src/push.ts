@@ -77,7 +77,6 @@ export class PushStore {
         this.env.VAPID_SUBJECT,
         this.env.VAPID_PUBLIC_KEY,
         this.env.VAPID_PRIVATE_KEY,
-        this.env.VAPID_SUBJECT,
       );
 
       let delivered = 0;
