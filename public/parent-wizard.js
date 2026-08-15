@@ -28,6 +28,7 @@
       #recorder .wizard-maintenance[open] summary::before{content:'▴ ';}
       #recorder .wizard-maintenance-body{display:grid;gap:10px;padding-top:4px}
       #recorder .wizard-finish-note{text-align:center;font-size:.84rem;color:#52606d;padding:8px}
+      #recorder #segmentSelect{display:block!important;width:100%!important;min-height:52px!important;font-size:1rem!important;background:#fff!important}
       @media(max-width:380px){#recorder .wizard-step-chip{font-size:.7rem;padding:8px 3px}#recorder .wizard-nav{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
@@ -76,7 +77,7 @@
           : 'לחץ “התחל הקלטה”, המתן ל-GPS, ואז צא לדרך.';
     }
 
-    if (landmark) landmark.style.display = recording ? '' : '';
+    if (landmark) landmark.style.display = '';
     if (recStatus && recording) recStatus.setAttribute('aria-live', 'polite');
   }
 
@@ -155,13 +156,16 @@
     if (photoInput) recorder.appendChild(photoInput);
     if (routeFilesInput) recorder.appendChild(routeFilesInput);
 
-    routeSection.remove(); statusSection.remove(); recordSection.remove(); dataSection.remove(); danger?.remove();
+    // Appending the existing sections above already MOVES them out of their old location.
+    // Do not call remove() on route/status/record/danger afterwards, or the wizard loses them.
+    if (dataSection.isConnected && !dataSection.contains(exportBtn) && !dataSection.querySelector('.route-data-tools')) dataSection.remove();
+
     priority?.insertAdjacentElement('afterend', wizard) || header.insertAdjacentElement('afterend', wizard);
     wizard.insertAdjacentElement('afterend', maintenance);
 
     const observer = new MutationObserver(refreshState);
     ['recordButton','landmarkButton','exportButton','recStatus','recPoints','recTime'].forEach(id => {
-      const node = document.getElementById(id); if (node) observer.observe(node, { attributes:true, childList:true, subtree:true, characterData:true });
+      const node = document.getElementById(id); if (node) observer.observe(node, { attributes:true, childList:true, subtree:true,characterData:true });
     });
     document.getElementById('recordButton')?.addEventListener('click', () => setTimeout(refreshState, 0));
     document.getElementById('landmarkButton')?.addEventListener('click', () => setTimeout(refreshState, 0));
