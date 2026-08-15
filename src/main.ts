@@ -37,6 +37,9 @@ export default {
     if (!injected.includes('/push-client.js')) {
       injected = injected.replace('</body>', '<script src="/push-client.js"></script></body>');
     }
+    if (!injected.includes('/bus-gps.js')) {
+      injected = injected.replace('</body>', '<script src="/bus-gps.js"></script></body>');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
