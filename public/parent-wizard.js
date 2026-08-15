@@ -56,29 +56,30 @@
 
   function refreshState() {
     const record = document.getElementById('recordButton');
-    const landmark = document.getElementById('landmarkButton');
     const exportBtn = document.getElementById('exportButton');
     const step2Next = document.getElementById('wizardStep2Next');
-    const recStatus = document.getElementById('recStatus');
     const recording = !!record && /סיים/.test(record.textContent || '');
     const hasFinishedRecording = !!exportBtn && !exportBtn.disabled;
 
     if (step2Next) {
       step2Next.disabled = !hasFinishedRecording;
-      step2Next.textContent = recording ? 'קודם מסיימים את ההקלטה' : hasFinishedRecording ? 'המשך לבדיקה ושמירה ←' : 'התחל וסיים הקלטה כדי להמשיך';
+      const wanted = recording
+        ? 'קודם מסיימים את ההקלטה'
+        : hasFinishedRecording
+          ? 'המשך לבדיקה ושמירה ←'
+          : 'התחל וסיים הקלטה כדי להמשיך';
+      if (step2Next.textContent !== wanted) step2Next.textContent = wanted;
     }
 
     const liveHint = document.getElementById('wizardLiveHint');
     if (liveHint) {
-      liveHint.textContent = recording
+      const wanted = recording
         ? '🟢 ההקלטה פעילה. הולכים במסלול, ובכל מקום חשוב לוחצים “סמן נקודה”. אחרי הסימון אפשר לצרף תמונה.'
         : hasFinishedRecording
           ? '✅ ההקלטה הסתיימה. אפשר לעבור לשלב הבא, לבדוק ולשמור.'
           : 'לחץ “התחל הקלטה”, המתן ל-GPS, ואז צא לדרך.';
+      if (liveHint.textContent !== wanted) liveHint.textContent = wanted;
     }
-
-    if (landmark) landmark.style.display = '';
-    if (recStatus && recording) recStatus.setAttribute('aria-live', 'polite');
   }
 
   function build() {
@@ -152,23 +153,24 @@
     if (danger) maintenanceBody.appendChild(danger);
     maintenance.append(summary, maintenanceBody);
 
-    // Keep hidden inputs attached to live DOM so Android camera/file picker keeps working.
     if (photoInput) recorder.appendChild(photoInput);
     if (routeFilesInput) recorder.appendChild(routeFilesInput);
 
-    // Appending the existing sections above already MOVES them out of their old location.
-    // Do not call remove() on route/status/record/danger afterwards, or the wizard loses them.
     if (dataSection.isConnected && !dataSection.contains(exportBtn) && !dataSection.querySelector('.route-data-tools')) dataSection.remove();
 
     priority?.insertAdjacentElement('afterend', wizard) || header.insertAdjacentElement('afterend', wizard);
     wizard.insertAdjacentElement('afterend', maintenance);
 
-    const observer = new MutationObserver(refreshState);
-    ['recordButton','landmarkButton','exportButton','recStatus','recPoints','recTime'].forEach(id => {
-      const node = document.getElementById(id); if (node) observer.observe(node, { attributes:true, childList:true, subtree:true,characterData:true });
+    // Watch only content changes. Watching attributes here caused a feedback loop:
+    // refreshState() changed attributes which immediately retriggered the observer.
+    const observer = new MutationObserver(() => refreshState());
+    ['recordButton','recStatus','recPoints','recTime'].forEach(id => {
+      const node = document.getElementById(id);
+      if (node) observer.observe(node, { childList:true, subtree:true, characterData:true });
     });
-    document.getElementById('recordButton')?.addEventListener('click', () => setTimeout(refreshState, 0));
-    document.getElementById('landmarkButton')?.addEventListener('click', () => setTimeout(refreshState, 0));
+
+    document.getElementById('recordButton')?.addEventListener('click', () => setTimeout(refreshState, 50));
+    document.getElementById('landmarkButton')?.addEventListener('click', () => setTimeout(refreshState, 50));
     refreshState();
     return true;
   }
