@@ -13,3 +13,9 @@ CREATE TABLE IF NOT EXISTS trips (
 );
 
 CREATE INDEX IF NOT EXISTS idx_trips_child_status ON trips(child_id, status);
+
+CREATE TABLE IF NOT EXISTS route_recordings (
+  segment TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
