@@ -52,6 +52,9 @@ export default {
     if (!injected.includes('/layout-v3.js')) {
       injected = injected.replace('</body>', '<script src="/layout-v3.js"></script></body>');
     }
+    if (!injected.includes('/parent-ui-priority.js')) {
+      injected = injected.replace('</body>', '<script src="/parent-ui-priority.js"></script></body>');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
