@@ -13,6 +13,13 @@ type StoredSubscription = {
   keys: { p256dh: string; auth: string };
 };
 
+const REQUIRED_SEGMENTS = new Set([
+  'home-to-38283',
+  '38252-to-school',
+  'school-to-36743',
+  '33734-to-home',
+]);
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -38,6 +45,32 @@ export class PushStore {
     if (url.pathname === '/status' && request.method === 'GET') {
       const subs = await this.state.storage.list<StoredSubscription>({ prefix: 'sub:' });
       return json({ subscriptions: subs.size });
+    }
+
+    if (url.pathname === '/routes' && request.method === 'GET') {
+      const stored = await this.state.storage.list<any>({ prefix: 'route:' });
+      const recordings = [...stored.values()]
+        .filter(x => x && REQUIRED_SEGMENTS.has(x.segment))
+        .sort((a, b) => String(a.segment).localeCompare(String(b.segment)));
+      return json({ recordings, count: recordings.length });
+    }
+
+    const routeMatch = url.pathname.match(/^\/routes\/([^/]+)$/);
+    if (routeMatch && request.method === 'POST') {
+      const segment = decodeURIComponent(routeMatch[1]);
+      if (!REQUIRED_SEGMENTS.has(segment)) return json({ detail: 'Invalid route segment' }, 400);
+
+      const body = await request.json<any>();
+      if (body?.segment !== segment || !Array.isArray(body?.points) || !Array.isArray(body?.landmarks)) {
+        return json({ detail: 'Invalid route recording' }, 400);
+      }
+
+      const key = `route:${segment}`;
+      const existing = await this.state.storage.get<any>(key);
+      if (existing) return json({ ok: true, stored: false, reason: 'already_exists', segment });
+
+      await this.state.storage.put(key, body);
+      return json({ ok: true, stored: true, segment });
     }
 
     if (url.pathname === '/send' && request.method === 'POST') {
@@ -79,6 +112,21 @@ function parentStub(env: PushEnv) {
 
 export async function handlePushApi(request: Request, env: PushEnv): Promise<Response> {
   const url = new URL(request.url);
+
+  if (url.pathname === '/api/route-recordings' && request.method === 'GET') {
+    return parentStub(env).fetch('https://push.internal/routes');
+  }
+
+  const routeRecordingMatch = url.pathname.match(/^\/api\/route-recordings\/([^/]+)$/);
+  if (routeRecordingMatch && request.method === 'POST') {
+    const segment = decodeURIComponent(routeRecordingMatch[1]);
+    const body = await request.text();
+    return parentStub(env).fetch(`https://push.internal/routes/${encodeURIComponent(segment)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+    });
+  }
 
   if (url.pathname === '/api/push/public-key' && request.method === 'GET') {
     if (!env.VAPID_PUBLIC_KEY) return json({ detail: 'Push is not configured' }, 503);
