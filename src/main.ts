@@ -64,6 +64,9 @@ export default {
     if (!injected.includes('/recorder-state-sentinel.js')) {
       injected = injected.replace('</body>', '<script src="/recorder-state-sentinel.js"></script></body>');
     }
+    if (!injected.includes('/recording-start-fix.js')) {
+      injected = injected.replace('</body>', '<script src="/recording-start-fix.js"></script></body>');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
