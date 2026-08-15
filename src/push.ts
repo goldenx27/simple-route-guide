@@ -107,11 +107,11 @@ export async function handlePushApi(request: Request, env: PushEnv): Promise<Res
     }
 
     const accuracy = Number.isFinite(Number(body?.accuracy)) ? Math.round(Number(body.accuracy)) : null;
-    const mapUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lon}`)}`;
     const step = typeof body?.step === 'string' ? body.step : '';
     const payload = {
       title: '🆘 מאור צריך עזרה',
-      body: `${step ? step + ' · ' : ''}מיקום נשלח${accuracy ? ` · דיוק ±${accuracy} מ׳` : ''}`,
+      body: `${step ? step + ' · ' : ''}📍 לחץ כאן כדי לראות את מאור במפה${accuracy ? ` · דיוק ±${accuracy} מ׳` : ''}`,
       tag: `maor-help-${Date.now()}`,
       data: { url: mapUrl, lat, lon, accuracy, at: new Date().toISOString() },
     };
