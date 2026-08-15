@@ -18,7 +18,7 @@
     const s=document.createElement('style');
     s.id='parentTestModeStyles';
     s.textContent=`
-      #recorder .parent-test-panel{display:grid;gap:10px;margin:10px 0 12px;padding:14px;border-radius:18px;background:#f7f8fa;border:1px solid #e4e9ed}
+      #recorder .parent-test-panel{display:grid;gap:10px;margin:18px 0 12px;padding:14px;border-radius:18px;background:#f7f8fa;border:1px solid #e4e9ed}
       #recorder .parent-test-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
       #recorder .parent-test-title{font-weight:900;font-size:1rem;color:#17202a}
       #recorder .parent-test-state{font-size:.76rem;font-weight:900;padding:6px 9px;border-radius:999px;background:#e9eef3;color:#52606d;white-space:nowrap}
@@ -92,8 +92,7 @@
 
   function install(){
     const recorder=document.getElementById('recorder');
-    const header=recorder?.querySelector('.parent-header');
-    if(!recorder||!header)return false;
+    if(!recorder)return false;
     if(document.getElementById('parentTestToggle'))return true;
     addStyles();
 
@@ -114,7 +113,7 @@
 
     actions.append(btn,banner,clear);
     panel.append(head,help,actions);
-    header.insertAdjacentElement('afterend',panel);
+    recorder.appendChild(panel);
     paint();
     return true;
   }
