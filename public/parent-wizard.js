@@ -1,6 +1,7 @@
 (() => {
   let cloudCovered = new Set();
   let busy = false;
+  let finished = false;
 
   function addStyles() {
     if (document.getElementById('parentWizardStyles')) return;
@@ -22,7 +23,6 @@
       #recorder .wizard-current-segment .kicker{font-size:.72rem;color:#52606d;font-weight:800}
       #recorder .wizard-current-segment .name{font-size:1rem;font-weight:900;color:#17202a}
       #recorder .wizard-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-      #recorder .wizard-nav.single{grid-template-columns:1fr}
       #recorder .wizard-nav button{margin:0;min-height:52px}
       #recorder .wizard-upload{min-height:58px!important}
       #recorder .wizard-upload.uploading{opacity:.65}
@@ -75,18 +75,14 @@
     try {
       const points = typeof recPoints !== 'undefined' && Array.isArray(recPoints) ? recPoints : [];
       const landmarks = typeof recLandmarks !== 'undefined' && Array.isArray(recLandmarks) ? recLandmarks : [];
-      return {
-        segment,
-        recordedAt: new Date().toISOString(),
-        points: JSON.parse(JSON.stringify(points)),
-        landmarks: JSON.parse(JSON.stringify(landmarks)),
-      };
+      return { segment, recordedAt:new Date().toISOString(), points:JSON.parse(JSON.stringify(points)), landmarks:JSON.parse(JSON.stringify(landmarks)) };
     } catch (e) {
       return { segment, recordedAt:new Date().toISOString(), points:[], landmarks:[] };
     }
   }
 
   function resetDraft() {
+    finished = false;
     try {
       if (typeof recWatch !== 'undefined' && recWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(recWatch);
       if (typeof recTimer !== 'undefined' && recTimer) clearInterval(recTimer);
@@ -97,199 +93,147 @@
       if (typeof recLandmarks !== 'undefined') recLandmarks = [];
       if (typeof pendingLandmark !== 'undefined') pendingLandmark = null;
     } catch (e) {}
-
-    const points = document.getElementById('recPoints'); if (points) points.textContent = '0';
-    const time = document.getElementById('recTime'); if (time) time.textContent = '00:00';
-    const accuracy = document.getElementById('recAccuracy'); if (accuracy) accuracy.textContent = '—';
-    const status = document.getElementById('recStatus'); if (status) status.textContent = 'מוכן להתחלה';
-    const log = document.getElementById('recLog'); if (log) log.innerHTML = '<div class="small">התמונות יוקטנו ויידחסו אוטומטית. לכל נקודה אפשר לצרף כמה תמונות.</div>';
-    const record = document.getElementById('recordButton'); if (record) { record.textContent = '● התחל הקלטה'; record.className = 'primary'; }
-    const landmark = document.getElementById('landmarkButton'); if (landmark) landmark.disabled = true;
-    const exportBtn = document.getElementById('exportButton'); if (exportBtn) exportBtn.disabled = true;
-    const clearBtn = document.getElementById('clearRecordingButton'); if (clearBtn) clearBtn.disabled = true;
+    const points=document.getElementById('recPoints'); if(points) points.textContent='0';
+    const time=document.getElementById('recTime'); if(time) time.textContent='00:00';
+    const accuracy=document.getElementById('recAccuracy'); if(accuracy) accuracy.textContent='—';
+    const status=document.getElementById('recStatus'); if(status) status.textContent='מוכן להתחלה';
+    const log=document.getElementById('recLog'); if(log) log.innerHTML='<div class="small">התמונות יוקטנו ויידחסו אוטומטית. לכל נקודה אפשר לצרף כמה תמונות.</div>';
+    const record=document.getElementById('recordButton'); if(record){record.textContent='● התחל הקלטה';record.className='primary';}
+    const landmark=document.getElementById('landmarkButton'); if(landmark) landmark.disabled=true;
+    const clearBtn=document.getElementById('clearRecordingButton'); if(clearBtn) clearBtn.disabled=true;
+    paint();
   }
 
   async function fetchCoverage() {
     try {
-      const res = await fetch('/api/route-recordings', { cache:'no-store' });
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
-      cloudCovered = new Set((data.recordings || []).map(r => r?.segment).filter(Boolean));
-    } catch (e) {
-      console.warn('coverage read failed', e);
-    }
+      const res=await fetch('/api/route-recordings',{cache:'no-store'});
+      if(!res.ok) throw new Error(String(res.status));
+      const data=await res.json();
+      cloudCovered=new Set((data.recordings||[]).map(r=>r?.segment).filter(Boolean));
+    } catch(e){ console.warn('coverage read failed',e); }
     paint();
   }
 
   async function uploadCurrent() {
     if (busy) return;
-    const data = getDraftData();
-    if (!data.segment || !data.points.length) {
-      const status = document.getElementById('recStatus');
-      if (status) status.textContent = 'אין עדיין נקודות GPS לשמירה';
+    const data=getDraftData();
+    if(!finished || !data.segment || !data.points.length){
+      const status=document.getElementById('recStatus');
+      if(status) status.textContent='סיים קודם את ההקלטה וודא שנקלטה לפחות נקודת GPS אחת';
       return;
     }
-
-    busy = true;
-    paint();
-    try {
-      const res = await fetch('/api/route-recordings/' + encodeURIComponent(data.segment), {
-        method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error('upload ' + res.status);
-
-      if (typeof saveRouteData === 'function') await saveRouteData(data);
-      try {
-        if (typeof routeRecordings !== 'undefined') routeRecordings[data.segment] = data;
-      } catch (e) {}
-
+    busy=true; paint();
+    try{
+      const res=await fetch('/api/route-recordings/'+encodeURIComponent(data.segment),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});
+      if(!res.ok) throw new Error('upload '+res.status);
+      if(typeof saveRouteData==='function') await saveRouteData(data);
+      try{ if(typeof routeRecordings!=='undefined') routeRecordings[data.segment]=data; }catch(e){}
       cloudCovered.add(data.segment);
       resetDraft();
       await fetchCoverage();
       setPage('list');
-    } catch (e) {
-      console.error('route upload failed', e);
-      const status = document.getElementById('recStatus');
-      if (status) status.textContent = '❌ ההעלאה לענן נכשלה. נסה שוב.';
-    } finally {
-      busy = false;
-      paint();
-    }
+    }catch(e){
+      console.error('route upload failed',e);
+      const status=document.getElementById('recStatus'); if(status) status.textContent='❌ ההעלאה לענן נכשלה. נסה שוב.';
+    }finally{ busy=false; paint(); }
   }
 
-  function isRecording() {
-    const b = document.getElementById('recordButton');
-    return !!b && /סיים/.test(b.textContent || '');
+  function isRecording(){
+    const b=document.getElementById('recordButton');
+    return !!b && /סיים/.test(b.textContent||'');
   }
 
-  function recordingFinished() {
-    const exportBtn = document.getElementById('exportButton');
-    return !!exportBtn && !exportBtn.disabled && !isRecording();
+  function recordingFinished(){
+    const hasPoints=typeof recPoints!=='undefined' && Array.isArray(recPoints) && recPoints.length>0;
+    return finished && hasPoints && !isRecording();
   }
 
-  function paint() {
-    const list = document.getElementById('wizardSegmentList');
-    const items = segments();
-    if (list) {
-      list.innerHTML = '';
-      for (const s of items) {
-        const covered = cloudCovered.has(s.value);
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'wizard-segment-row' + (covered ? ' covered' : '');
-        b.innerHTML = `<span class="name">${s.label}</span><span class="state">${covered ? '✅ מכוסה בענן' : '○ עדיין לא הוקלט'}</span>`;
-        b.addEventListener('click', () => selectSegment(s.value));
+  function paint(){
+    const list=document.getElementById('wizardSegmentList');
+    const items=segments();
+    if(list){
+      list.innerHTML='';
+      for(const s of items){
+        const covered=cloudCovered.has(s.value);
+        const b=document.createElement('button');
+        b.type='button'; b.className='wizard-segment-row'+(covered?' covered':'');
+        b.innerHTML=`<span class="name">${s.label}</span><span class="state">${covered?'✅ מכוסה בענן':'○ עדיין לא הוקלט'}</span>`;
+        b.addEventListener('click',()=>selectSegment(s.value));
         list.appendChild(b);
       }
     }
-
-    const summary = document.getElementById('wizardCoverageSummary');
-    const coveredCount = items.filter(s => cloudCovered.has(s.value)).length;
-    if (summary) {
-      summary.textContent = items.length ? `${coveredCount} מתוך ${items.length} מקטעים מכוסים בענן` : 'אין מקטעים מוגדרים';
-      summary.classList.toggle('complete', items.length > 0 && coveredCount === items.length);
+    const summary=document.getElementById('wizardCoverageSummary');
+    const coveredCount=items.filter(s=>cloudCovered.has(s.value)).length;
+    if(summary){summary.textContent=items.length?`${coveredCount} מתוך ${items.length} מקטעים מכוסים בענן`:'אין מקטעים מוגדרים';summary.classList.toggle('complete',items.length>0&&coveredCount===items.length);}
+    document.querySelectorAll('#recorder [data-segment-name]').forEach(n=>n.textContent=currentSegment().label);
+    const upload=document.getElementById('wizardUploadButton');
+    if(upload){
+      upload.disabled=busy||!recordingFinished();
+      upload.classList.toggle('uploading',busy);
+      upload.textContent=busy?'☁️ מעלה לענן…':isRecording()?'קודם מסיימים את ההקלטה':recordingFinished()?'☁️ סיים מקטע והעלה לענן':'התחל וסיים הקלטה כדי להעלות';
     }
-
-    document.querySelectorAll('#recorder [data-segment-name]').forEach(n => n.textContent = currentSegment().label);
-    const upload = document.getElementById('wizardUploadButton');
-    if (upload) {
-      upload.disabled = busy || !recordingFinished();
-      upload.classList.toggle('uploading', busy);
-      upload.textContent = busy ? '☁️ מעלה לענן…' : isRecording() ? 'קודם מסיימים את ההקלטה' : recordingFinished() ? '☁️ סיים מקטע והעלה לענן' : 'התחל וסיים הקלטה כדי להעלות';
-    }
-
-    const hint = document.getElementById('wizardLiveHint');
-    if (hint) hint.textContent = isRecording()
-      ? '🟢 ההקלטה פעילה. בכל מקום חשוב לחץ “סמן נקודה”, ואפשר לצרף תמונות.'
-      : recordingFinished()
-        ? '✅ ההקלטה הסתיימה. לחץ למטה כדי להעלות את המקטע לענן ולסמן אותו כמכוסה.'
-        : 'לחץ “התחל הקלטה”, המתן ל-GPS ואז צא לדרך.';
-
-    const state = document.getElementById('routeDataState');
-    if (state && items.length) state.textContent = `☁️ ${coveredCount}/${items.length} מקטעים מכוסים בענן`;
+    const hint=document.getElementById('wizardLiveHint');
+    if(hint) hint.textContent=isRecording()?'🟢 ההקלטה פעילה. בכל מקום חשוב לחץ “סמן נקודה”, ואפשר לצרף תמונות.':recordingFinished()?'✅ ההקלטה הסתיימה. לחץ למטה כדי להעלות את המקטע לענן ולסמן אותו כמכוסה.':'לחץ “התחל הקלטה”, המתן ל-GPS ואז צא לדרך.';
+    const state=document.getElementById('routeDataState'); if(state&&items.length) state.textContent=`☁️ ${coveredCount}/${items.length} מקטעים מכוסים בענן`;
   }
 
-  function build() {
-    const recorder = document.getElementById('recorder');
-    const header = recorder?.querySelector('.parent-header');
-    if (!recorder || !header || recorder.dataset.genericWizard === '1') return false;
+  function build(){
+    const recorder=document.getElementById('recorder');
+    const header=recorder?.querySelector('.parent-header');
+    if(!recorder||!header||recorder.dataset.genericWizard==='1') return false;
+    const priority=recorder.querySelector('.parent-priority-status');
+    const routeSection=[...recorder.querySelectorAll('.parent-section')].find(s=>s.querySelector('#segmentSelect'));
+    const statusSection=[...recorder.querySelectorAll('.parent-section')].find(s=>s.querySelector('.rec-panel'));
+    const recordSection=[...recorder.querySelectorAll('.parent-section')].find(s=>s.querySelector('#recLog'));
+    const dataSection=[...recorder.querySelectorAll('.parent-section')].find(s=>s.querySelector('.route-data-tools')||s.querySelector('#exportButton'));
+    const danger=recorder.querySelector('.parent-danger-zone');
+    const photoInput=document.getElementById('photoInput');
+    const routeFilesInput=document.getElementById('routeFilesInput');
+    if(!routeSection||!statusSection||!recordSection||!dataSection) return false;
+    recorder.dataset.genericWizard='1'; recorder.dataset.wizard='1'; addStyles();
+    const wizard=document.createElement('div'); wizard.className='parent-wizard';
+    const listPage=document.createElement('section'); listPage.className='wizard-page active'; listPage.dataset.page='list';
+    listPage.innerHTML='<div class="wizard-page-title">מקטעי המסלול</div><div class="wizard-help">בחר מקטע לעבודה. מקטע שמסומן בירוק כבר שמור בענן. אפשר לפתוח אותו שוב, להקליט מחדש ולעדכן את הגרסה בענן.</div><div id="wizardCoverageSummary" class="wizard-summary"></div><div id="wizardSegmentList" class="wizard-segment-list"></div>';
+    const recordPage=document.createElement('section'); recordPage.className='wizard-page'; recordPage.dataset.page='record';
+    recordPage.innerHTML='<div class="wizard-page-title">הקלטת מקטע</div><div class="wizard-current-segment"><div class="kicker">עובדים עכשיו על</div><div class="name" data-segment-name></div></div><div id="wizardLiveHint" class="wizard-help"></div>';
+    recordPage.appendChild(statusSection); recordPage.appendChild(recordSection);
+    const nav=document.createElement('div'); nav.className='wizard-nav';
+    const back=document.createElement('button'); back.type='button'; back.className='secondary'; back.textContent='→ חזרה לרשימת המקטעים'; back.onclick=()=>{if(!isRecording()){resetDraft();setPage('list');}};
+    const upload=document.createElement('button'); upload.id='wizardUploadButton'; upload.type='button'; upload.className='primary wizard-upload'; upload.onclick=uploadCurrent;
+    nav.append(back,upload); recordPage.appendChild(nav); wizard.append(listPage,recordPage);
+    const maintenance=document.createElement('details'); maintenance.className='wizard-maintenance parent-section';
+    const maintenanceSummary=document.createElement('summary'); maintenanceSummary.textContent='כלים מתקדמים ותחזוקה';
+    const body=document.createElement('div'); body.className='wizard-maintenance-body';
+    const dataTools=dataSection.querySelector('.route-data-tools');
+    if(dataTools){const loadBtn=dataTools.querySelector('button.secondary');if(loadBtn)loadBtn.textContent='📂 טען קבצי הקלטה';body.appendChild(dataTools);}
+    if(danger)body.appendChild(danger); maintenance.append(maintenanceSummary,body);
+    const select=document.getElementById('segmentSelect'); if(select)recorder.appendChild(select);
+    if(photoInput)recorder.appendChild(photoInput); if(routeFilesInput)recorder.appendChild(routeFilesInput);
+    document.getElementById('exportButton')?.remove(); routeSection.remove(); if(dataSection.isConnected)dataSection.remove();
+    priority?.insertAdjacentElement('afterend',wizard)||header.insertAdjacentElement('afterend',wizard); wizard.insertAdjacentElement('afterend',maintenance);
 
-    const priority = recorder.querySelector('.parent-priority-status');
-    const routeSection = [...recorder.querySelectorAll('.parent-section')].find(s => s.querySelector('#segmentSelect'));
-    const statusSection = [...recorder.querySelectorAll('.parent-section')].find(s => s.querySelector('.rec-panel'));
-    const recordSection = [...recorder.querySelectorAll('.parent-section')].find(s => s.querySelector('#recLog'));
-    const dataSection = [...recorder.querySelectorAll('.parent-section')].find(s => s.querySelector('.route-data-tools') || s.querySelector('#exportButton'));
-    const danger = recorder.querySelector('.parent-danger-zone');
-    const photoInput = document.getElementById('photoInput');
-    const routeFilesInput = document.getElementById('routeFilesInput');
-    if (!routeSection || !statusSection || !recordSection || !dataSection) return false;
-
-    recorder.dataset.genericWizard = '1';
-    recorder.dataset.wizard = '1';
-    addStyles();
-
-    const wizard = document.createElement('div'); wizard.className = 'parent-wizard';
-
-    const listPage = document.createElement('section');
-    listPage.className = 'wizard-page active'; listPage.dataset.page = 'list';
-    listPage.innerHTML = '<div class="wizard-page-title">מקטעי המסלול</div><div class="wizard-help">בחר מקטע לעבודה. מקטע שמסומן בירוק כבר שמור בענן. אפשר לפתוח אותו שוב, להקליט מחדש ולעדכן את הגרסה בענן.</div><div id="wizardCoverageSummary" class="wizard-summary"></div><div id="wizardSegmentList" class="wizard-segment-list"></div>';
-
-    const recordPage = document.createElement('section');
-    recordPage.className = 'wizard-page'; recordPage.dataset.page = 'record';
-    recordPage.innerHTML = '<div class="wizard-page-title">הקלטת מקטע</div><div class="wizard-current-segment"><div class="kicker">עובדים עכשיו על</div><div class="name" data-segment-name></div></div><div id="wizardLiveHint" class="wizard-help"></div>';
-    recordPage.appendChild(statusSection);
-    recordPage.appendChild(recordSection);
-    const nav = document.createElement('div'); nav.className = 'wizard-nav';
-    const back = document.createElement('button'); back.type='button'; back.className='secondary'; back.textContent='→ חזרה לרשימת המקטעים'; back.onclick=()=>{ if(!isRecording()){ resetDraft(); setPage('list'); } };
-    const upload = document.createElement('button'); upload.id='wizardUploadButton'; upload.type='button'; upload.className='primary wizard-upload'; upload.onclick=uploadCurrent;
-    nav.append(back, upload); recordPage.appendChild(nav);
-
-    wizard.append(listPage, recordPage);
-
-    const maintenance = document.createElement('details'); maintenance.className='wizard-maintenance parent-section';
-    const summary = document.createElement('summary'); summary.textContent='כלים מתקדמים ותחזוקה';
-    const body = document.createElement('div'); body.className='wizard-maintenance-body';
-    const dataTools = dataSection.querySelector('.route-data-tools');
-    if (dataTools) {
-      const loadBtn = dataTools.querySelector('button.secondary');
-      if (loadBtn) loadBtn.textContent = '📂 טען קבצי הקלטה';
-      body.appendChild(dataTools);
-    }
-    if (danger) body.appendChild(danger);
-    maintenance.append(summary, body);
-
-    const select = document.getElementById('segmentSelect');
-    if (select) recorder.appendChild(select);
-    if (photoInput) recorder.appendChild(photoInput);
-    if (routeFilesInput) recorder.appendChild(routeFilesInput);
-    document.getElementById('exportButton')?.remove();
-    routeSection.remove();
-    if (dataSection.isConnected) dataSection.remove();
-
-    priority?.insertAdjacentElement('afterend', wizard) || header.insertAdjacentElement('afterend', wizard);
-    wizard.insertAdjacentElement('afterend', maintenance);
-
-    // Only the record button state changes the wizard flow. GPS updates recStatus,
-    // recPoints and recTime continuously; observing those caused repeated full
-    // list rebuilds on mobile and could starve the UI thread while recording.
-    const recordButton = document.getElementById('recordButton');
-    if (recordButton) {
-      const observer = new MutationObserver(() => paint());
-      observer.observe(recordButton, { childList:true, subtree:true, characterData:true });
-      recordButton.addEventListener('click',()=>setTimeout(paint,80));
+    const recordButton=document.getElementById('recordButton');
+    if(recordButton){
+      const observer=new MutationObserver(()=>paint());
+      observer.observe(recordButton,{childList:true,subtree:true,characterData:true});
+      recordButton.addEventListener('click',()=>{
+        setTimeout(()=>{
+          if(isRecording()) finished=false;
+          else {
+            const hasPoints=typeof recPoints!=='undefined'&&Array.isArray(recPoints)&&recPoints.length>0;
+            finished=hasPoints;
+          }
+          paint();
+        },150);
+      });
     }
     document.getElementById('landmarkButton')?.addEventListener('click',()=>setTimeout(paint,80));
-
-    fetchCoverage();
-    paint();
-    return true;
+    fetchCoverage(); paint(); return true;
   }
 
-  function install() {
-    if (build()) return;
-    let tries = 0;
-    const timer = setInterval(() => { tries++; if (build() || tries > 40) clearInterval(timer); }, 100);
+  function install(){
+    if(build())return;
+    let tries=0; const timer=setInterval(()=>{tries++;if(build()||tries>40)clearInterval(timer);},100);
   }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
-  else install();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install); else install();
 })();
