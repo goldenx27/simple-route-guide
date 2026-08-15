@@ -60,6 +60,16 @@
     paint();
   }
 
+  async function showSegmentList() {
+    const summary = document.getElementById('wizardCoverageSummary');
+    if (summary) {
+      summary.textContent = '☁️ טוען מצב עדכני מהענן…';
+      summary.classList.remove('complete');
+    }
+    await fetchCoverage();
+    setPage('list');
+  }
+
   function selectSegment(value) {
     const select = document.getElementById('segmentSelect');
     if (!select) return;
@@ -106,7 +116,7 @@
 
   async function fetchCoverage() {
     try {
-      const res=await fetch('/api/route-recordings',{cache:'no-store'});
+      const res=await fetch('/api/route-recordings',{cache:'no-store',headers:{'cache-control':'no-cache'}});
       if(!res.ok) throw new Error(String(res.status));
       const data=await res.json();
       cloudCovered=new Set((data.recordings||[]).map(r=>r?.segment).filter(Boolean));
@@ -130,8 +140,7 @@
       try{ if(typeof routeRecordings!=='undefined') routeRecordings[data.segment]=data; }catch(e){}
       cloudCovered.add(data.segment);
       resetDraft();
-      await fetchCoverage();
-      setPage('list');
+      await showSegmentList();
     }catch(e){
       console.error('route upload failed',e);
       const status=document.getElementById('recStatus'); if(status) status.textContent='❌ ההעלאה לענן נכשלה. נסה שוב.';
@@ -198,7 +207,7 @@
     recordPage.innerHTML='<div class="wizard-page-title">הקלטת מקטע</div><div class="wizard-current-segment"><div class="kicker">עובדים עכשיו על</div><div class="name" data-segment-name></div></div><div id="wizardLiveHint" class="wizard-help"></div>';
     recordPage.appendChild(statusSection); recordPage.appendChild(recordSection);
     const nav=document.createElement('div'); nav.className='wizard-nav';
-    const back=document.createElement('button'); back.type='button'; back.className='secondary'; back.textContent='→ חזרה לרשימת המקטעים'; back.onclick=()=>{if(!isRecording()){resetDraft();setPage('list');}};
+    const back=document.createElement('button'); back.type='button'; back.className='secondary'; back.textContent='→ חזרה לרשימת המקטעים'; back.onclick=async()=>{if(!isRecording()){resetDraft();await showSegmentList();}};
     const upload=document.createElement('button'); upload.id='wizardUploadButton'; upload.type='button'; upload.className='primary wizard-upload'; upload.onclick=uploadCurrent;
     nav.append(back,upload); recordPage.appendChild(nav); wizard.append(listPage,recordPage);
     const maintenance=document.createElement('details'); maintenance.className='wizard-maintenance parent-section';
@@ -228,7 +237,7 @@
       });
     }
     document.getElementById('landmarkButton')?.addEventListener('click',()=>setTimeout(paint,80));
-    fetchCoverage(); paint(); return true;
+    showSegmentList(); return true;
   }
 
   function install(){
