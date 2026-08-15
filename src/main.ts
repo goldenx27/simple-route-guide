@@ -21,7 +21,7 @@ const PWA_HEAD = [
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname.startsWith('/api/push/')) {
+    if (url.pathname.startsWith('/api/push/') || url.pathname.startsWith('/api/route-recordings')) {
       return handlePushApi(request, env);
     }
 
@@ -45,6 +45,9 @@ export default {
     }
     if (!injected.includes('/sound-ui.js')) {
       injected = injected.replace('</body>', '<script src="/sound-ui.js"></script></body>');
+    }
+    if (!injected.includes('/route-cloud-sync.js')) {
+      injected = injected.replace('</body>', '<script src="/route-cloud-sync.js"></script></body>');
     }
     if (!injected.includes('/layout-v3.js')) {
       injected = injected.replace('</body>', '<script src="/layout-v3.js"></script></body>');
