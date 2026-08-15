@@ -268,12 +268,15 @@
     priority?.insertAdjacentElement('afterend', wizard) || header.insertAdjacentElement('afterend', wizard);
     wizard.insertAdjacentElement('afterend', maintenance);
 
-    const observer = new MutationObserver(() => paint());
-    ['recordButton','recStatus','recPoints','recTime'].forEach(id => {
-      const node = document.getElementById(id);
-      if (node) observer.observe(node, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['disabled'] });
-    });
-    document.getElementById('recordButton')?.addEventListener('click',()=>setTimeout(paint,80));
+    // Only the record button state changes the wizard flow. GPS updates recStatus,
+    // recPoints and recTime continuously; observing those caused repeated full
+    // list rebuilds on mobile and could starve the UI thread while recording.
+    const recordButton = document.getElementById('recordButton');
+    if (recordButton) {
+      const observer = new MutationObserver(() => paint());
+      observer.observe(recordButton, { childList:true, subtree:true, characterData:true });
+      recordButton.addEventListener('click',()=>setTimeout(paint,80));
+    }
     document.getElementById('landmarkButton')?.addEventListener('click',()=>setTimeout(paint,80));
 
     fetchCoverage();
