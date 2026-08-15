@@ -38,28 +38,26 @@
     b.className=(on?'secondary ':'primary ')+'parent-device-state';
   }
 
-  function findParentStatusSection(recorder) {
-    return [...recorder.querySelectorAll('.parent-section')].find(section => section.querySelector('#routeDataState') || section.textContent?.includes('מצב נוכחי')) || null;
+  function ensurePriorityArea(recorder) {
+    let priority=recorder.querySelector('.parent-priority-status');
+    if(priority)return priority;
+    const header=recorder.querySelector('.parent-header');
+    if(!header)return null;
+    priority=document.createElement('div');
+    priority.className='parent-priority-status';
+    header.insertAdjacentElement('afterend',priority);
+    return priority;
   }
 
   function installParentButton() {
     const recorder=document.getElementById('recorder'); if(!recorder)return false;
+    const priority=ensurePriorityArea(recorder); if(!priority)return false;
     let b=document.getElementById('parentPushButton');
     if(!b){
       b=document.createElement('button');
       b.id='parentPushButton'; b.type='button'; b.onclick=subscribeParent;
     }
-
-    const statusSection=findParentStatusSection(recorder);
-    const legacyActions=recorder.querySelector('.actions');
-    if(statusSection){
-      if(b.parentElement!==statusSection) statusSection.appendChild(b);
-    } else if(legacyActions){
-      const back=[...legacyActions.querySelectorAll('button')].find(x=>x.textContent.includes('חזרה למסך מאור'));
-      if(back)legacyActions.insertBefore(b,back);else legacyActions.appendChild(b);
-    } else if(!b.isConnected){
-      recorder.appendChild(b);
-    }
+    if(b.parentElement!==priority) priority.appendChild(b);
     paintPushButton();
     return true;
   }
@@ -93,8 +91,7 @@
   },500);
 
   function bootUi(){
-    installParentButton();
-    [50,150,350,800,1500].forEach(ms=>setTimeout(installParentButton,ms));
+    [0,50,150,350,800,1500,3000].forEach(ms=>setTimeout(installParentButton,ms));
   }
 
   registerServiceWorker().catch(()=>{});
