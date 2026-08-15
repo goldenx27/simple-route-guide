@@ -127,6 +127,8 @@
     const panel=r.querySelector('.rec-panel');
     const log=document.getElementById('recLog');
     const actions=r.querySelector('.actions');
+    const photoInput=document.getElementById('photoInput');
+    const routeFilesInput=document.getElementById('routeFilesInput');
     if(!heading||!select||!panel||!actions)return;
 
     const header=document.createElement('div');header.className='parent-header';
@@ -160,6 +162,11 @@
     const clearRec=document.getElementById('clearRecordingButton');if(clearRec)danger.appendChild(clearRec);
     const legacyBottom=[...actions.querySelectorAll('button')].find(b=>b.textContent.includes('חזרה למסך מאור'));
     if(legacyBottom){legacyBottom.classList.add('parent-bottom-back');legacyBottom.remove()}
+
+    // Preserve the hidden file inputs before removing their old actions container.
+    // Android requires the camera/file input to remain attached to the live DOM when click() is triggered.
+    if(photoInput)r.appendChild(photoInput);
+    if(routeFilesInput)r.appendChild(routeFilesInput);
 
     oldTop?.remove();actions.remove();
     r.prepend(header,routeSec,statusSec,recordSec,dataSec,danger);
