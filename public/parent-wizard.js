@@ -1,11 +1,6 @@
 (() => {
-  let currentStep = 1;
-  const SEGMENTS = [
-    { value:'home-to-38283', label:'בית → תחנה 38283' },
-    { value:'38252-to-school', label:'תחנה 38252 → בית ספר רמון' },
-    { value:'school-to-36743', label:'בית ספר רמון → תחנה 36743' },
-    { value:'33734-to-home', label:'תחנה 33734 → בית' },
-  ];
+  let cloudCovered = new Set();
+  let busy = false;
 
   function addStyles() {
     if (document.getElementById('parentWizardStyles')) return;
@@ -13,141 +8,211 @@
     style.id = 'parentWizardStyles';
     style.textContent = `
       #recorder .parent-wizard{display:grid;gap:12px}
-      #recorder .wizard-progress{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-      #recorder .wizard-step-chip{border:0;border-radius:14px;padding:9px 5px;background:#eef3f7;color:#52606d;font-size:.76rem;font-weight:800;line-height:1.2}
-      #recorder .wizard-step-chip.active{background:#17202a;color:#fff}
-      #recorder .wizard-step-chip.done{background:#e8f5ec;color:#176b36}
       #recorder .wizard-page{display:none;background:#f7f8fa;border-radius:20px;padding:14px;gap:12px}
       #recorder .wizard-page.active{display:grid}
-      #recorder .wizard-page-title{font-size:1.05rem;font-weight:900;color:#17202a}
+      #recorder .wizard-page-title{font-size:1.08rem;font-weight:900;color:#17202a}
       #recorder .wizard-help{font-size:.84rem;line-height:1.45;color:#52606d;background:#fff;border-radius:14px;padding:10px 12px}
+      #recorder .wizard-segment-list{display:grid;gap:8px}
+      #recorder .wizard-segment-row{width:100%;display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;text-align:right;padding:13px 14px;border-radius:15px;background:#fff;color:#17202a;border:1px solid #e5eaee}
+      #recorder .wizard-segment-row.covered{background:#eef9f1;border-color:#cdebd6}
+      #recorder .wizard-segment-row .name{font-weight:900;font-size:.94rem}
+      #recorder .wizard-segment-row .state{font-size:.78rem;font-weight:900;white-space:nowrap;color:#7a8792}
+      #recorder .wizard-segment-row.covered .state{color:#176b36}
       #recorder .wizard-current-segment{display:grid;gap:4px;text-align:center;background:#eaf1f6;border-radius:15px;padding:11px 12px}
       #recorder .wizard-current-segment .kicker{font-size:.72rem;color:#52606d;font-weight:800}
       #recorder .wizard-current-segment .name{font-size:1rem;font-weight:900;color:#17202a}
-      #recorder .wizard-segment-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
-      #recorder .wizard-segment-pill{padding:7px 3px;border-radius:10px;background:#edf1f4;color:#7a8792;font-size:.68rem;font-weight:900;text-align:center}
-      #recorder .wizard-segment-pill.current{background:#17202a;color:#fff}
-      #recorder .wizard-segment-pill.past{background:#e8f5ec;color:#176b36}
-      #recorder .wizard-next-card{background:#e8f5ec;color:#176b36;border-radius:15px;padding:12px;text-align:center;font-weight:900;line-height:1.45}
-      #recorder .wizard-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
+      #recorder .wizard-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}
       #recorder .wizard-nav.single{grid-template-columns:1fr}
       #recorder .wizard-nav button{margin:0;min-height:52px}
+      #recorder .wizard-upload{min-height:58px!important}
+      #recorder .wizard-upload.uploading{opacity:.65}
       #recorder .wizard-page .parent-section{background:transparent!important;padding:0!important;border-radius:0!important}
       #recorder .wizard-page .parent-section-title{display:none!important}
       #recorder .wizard-page .rec-log{max-height:330px}
+      #recorder .wizard-summary{padding:11px 12px;border-radius:14px;background:#eef3f7;text-align:center;font-size:.84rem;font-weight:900}
+      #recorder .wizard-summary.complete{background:#e8f5ec;color:#176b36}
       #recorder .wizard-maintenance{margin-top:2px}
       #recorder .wizard-maintenance summary{cursor:pointer;font-weight:900;color:#52606d;padding:12px 4px;list-style:none}
       #recorder .wizard-maintenance summary::-webkit-details-marker{display:none}
       #recorder .wizard-maintenance summary::before{content:'▾ ';}
       #recorder .wizard-maintenance[open] summary::before{content:'▴ ';}
       #recorder .wizard-maintenance-body{display:grid;gap:10px;padding-top:4px}
-      #recorder .wizard-finish-note{text-align:center;font-size:.84rem;color:#52606d;padding:8px}
-      #recorder #segmentSelect{display:block!important;width:100%!important;min-height:52px!important;font-size:1rem!important;background:#fff!important}
-      @media(max-width:380px){#recorder .wizard-step-chip{font-size:.7rem;padding:8px 3px}#recorder .wizard-nav{grid-template-columns:1fr}#recorder .wizard-segment-pill{font-size:.61rem}}
+      #recorder #segmentSelect,#recorder #exportButton{display:none!important}
+      @media(max-width:380px){#recorder .wizard-nav{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
   }
 
-  function button(label, className, fn) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = className; b.textContent = label;
-    b.addEventListener('click', fn); return b;
+  function segments() {
+    const select = document.getElementById('segmentSelect');
+    return [...(select?.options || [])].map(o => ({ value:o.value, label:o.textContent?.trim() || o.value }));
   }
 
-  function segmentIndex() {
-    const value = document.getElementById('segmentSelect')?.value;
-    const i = SEGMENTS.findIndex(s => s.value === value);
-    return i >= 0 ? i : 0;
+  function currentSegment() {
+    const select = document.getElementById('segmentSelect');
+    const item = segments().find(s => s.value === select?.value);
+    return item || segments()[0] || { value:'', label:'מקטע' };
   }
 
-  function segmentLabel(index = segmentIndex()) { return SEGMENTS[index]?.label || 'מקטע'; }
-
-  function paintSegmentContext() {
-    const i = segmentIndex();
-    document.querySelectorAll('#recorder [data-segment-name]').forEach(n => n.textContent = segmentLabel(i));
-    document.querySelectorAll('#recorder .wizard-segment-pill').forEach((n, idx) => {
-      n.classList.toggle('current', idx === i);
-      n.classList.toggle('past', idx < i);
-    });
-    const nextCard = document.getElementById('wizardNextCard');
-    const nextBtn = document.getElementById('wizardNextSegmentButton');
-    if (i < SEGMENTS.length - 1) {
-      if (nextCard) nextCard.innerHTML = `✅ המקטע הזה הסתיים<br>הבא: ${SEGMENTS[i+1].label}`;
-      if (nextBtn) nextBtn.textContent = `המשך למקטע הבא ←`;
-    } else {
-      if (nextCard) nextCard.innerHTML = '🎉 זה המקטע הרביעי והאחרון. אחרי ששמרת — סיימנו את כל המסלול.';
-      if (nextBtn) nextBtn.textContent = '✅ סיימתי את כל 4 המקטעים';
-    }
+  function setPage(name) {
+    document.querySelectorAll('#recorder .wizard-page').forEach(p => p.classList.toggle('active', p.dataset.page === name));
+    document.getElementById('recorder')?.scrollTo({ top:0, behavior:'smooth' });
+    paint();
   }
 
-  function setStep(step) {
-    currentStep = Math.max(1, Math.min(3, step));
-    document.querySelectorAll('#recorder .wizard-page').forEach((p, i) => p.classList.toggle('active', i + 1 === currentStep));
-    document.querySelectorAll('#recorder .wizard-step-chip').forEach((c, i) => {
-      c.classList.toggle('active', i + 1 === currentStep);
-      c.classList.toggle('done', i + 1 < currentStep);
-    });
-    document.getElementById('recorder')?.scrollTo({ top: 0, behavior: 'smooth' });
-    paintSegmentContext(); refreshState();
-  }
-
-  function resetRecordingDraft() {
-    // Clear only the in-progress recorder state. Saved route recordings remain untouched.
-    if (typeof window.clearRecording === 'function') {
-      window.clearRecording();
-      return;
-    }
-    const clearBtn = document.getElementById('clearRecordingButton');
-    if (clearBtn && !clearBtn.disabled) clearBtn.click();
-  }
-
-  function goNextSegment() {
+  function selectSegment(value) {
     const select = document.getElementById('segmentSelect');
     if (!select) return;
-    const i = segmentIndex();
-    if (i >= SEGMENTS.length - 1) { window.closeRecorder?.(); return; }
-
-    // The previous segment is already finished/saved. Reset its temporary points,
-    // landmarks, photos and counters BEFORE switching to the next segment.
-    resetRecordingDraft();
-
-    select.value = SEGMENTS[i + 1].value;
+    resetDraft();
+    select.value = value;
     select.dispatchEvent(new Event('change', { bubbles:true }));
-    setStep(2);
-    setTimeout(() => {
-      const status = document.getElementById('recStatus');
-      if (status) status.textContent = `מוכן להקלטת ${SEGMENTS[i+1].label}`;
-      const points = document.getElementById('recPoints'); if (points) points.textContent = '0';
-      const time = document.getElementById('recTime'); if (time) time.textContent = '00:00';
-      const accuracy = document.getElementById('recAccuracy'); if (accuracy) accuracy.textContent = '—';
-      document.getElementById('recordButton')?.scrollIntoView({ behavior:'smooth', block:'center' });
-      refreshState();
-    }, 50);
+    setPage('record');
+    setTimeout(() => document.getElementById('recordButton')?.scrollIntoView({ behavior:'smooth', block:'center' }), 50);
   }
 
-  function refreshState() {
-    const record = document.getElementById('recordButton');
+  function getDraftData() {
+    const segment = currentSegment().value;
+    try {
+      const points = typeof recPoints !== 'undefined' && Array.isArray(recPoints) ? recPoints : [];
+      const landmarks = typeof recLandmarks !== 'undefined' && Array.isArray(recLandmarks) ? recLandmarks : [];
+      return {
+        segment,
+        recordedAt: new Date().toISOString(),
+        points: JSON.parse(JSON.stringify(points)),
+        landmarks: JSON.parse(JSON.stringify(landmarks)),
+      };
+    } catch (e) {
+      return { segment, recordedAt:new Date().toISOString(), points:[], landmarks:[] };
+    }
+  }
+
+  function resetDraft() {
+    try {
+      if (typeof recWatch !== 'undefined' && recWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(recWatch);
+      if (typeof recTimer !== 'undefined' && recTimer) clearInterval(recTimer);
+      if (typeof recWatch !== 'undefined') recWatch = null;
+      if (typeof recTimer !== 'undefined') recTimer = null;
+      if (typeof recStarted !== 'undefined') recStarted = null;
+      if (typeof recPoints !== 'undefined') recPoints = [];
+      if (typeof recLandmarks !== 'undefined') recLandmarks = [];
+      if (typeof pendingLandmark !== 'undefined') pendingLandmark = null;
+    } catch (e) {}
+
+    const points = document.getElementById('recPoints'); if (points) points.textContent = '0';
+    const time = document.getElementById('recTime'); if (time) time.textContent = '00:00';
+    const accuracy = document.getElementById('recAccuracy'); if (accuracy) accuracy.textContent = '—';
+    const status = document.getElementById('recStatus'); if (status) status.textContent = 'מוכן להתחלה';
+    const log = document.getElementById('recLog'); if (log) log.innerHTML = '<div class="small">התמונות יוקטנו ויידחסו אוטומטית. לכל נקודה אפשר לצרף כמה תמונות.</div>';
+    const record = document.getElementById('recordButton'); if (record) { record.textContent = '● התחל הקלטה'; record.className = 'primary'; }
+    const landmark = document.getElementById('landmarkButton'); if (landmark) landmark.disabled = true;
+    const exportBtn = document.getElementById('exportButton'); if (exportBtn) exportBtn.disabled = true;
+    const clearBtn = document.getElementById('clearRecordingButton'); if (clearBtn) clearBtn.disabled = true;
+  }
+
+  async function fetchCoverage() {
+    try {
+      const res = await fetch('/api/route-recordings', { cache:'no-store' });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      cloudCovered = new Set((data.recordings || []).map(r => r?.segment).filter(Boolean));
+    } catch (e) {
+      console.warn('coverage read failed', e);
+    }
+    paint();
+  }
+
+  async function uploadCurrent() {
+    if (busy) return;
+    const data = getDraftData();
+    if (!data.segment || !data.points.length) {
+      const status = document.getElementById('recStatus');
+      if (status) status.textContent = 'אין עדיין נקודות GPS לשמירה';
+      return;
+    }
+
+    busy = true;
+    paint();
+    try {
+      const res = await fetch('/api/route-recordings/' + encodeURIComponent(data.segment), {
+        method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('upload ' + res.status);
+
+      if (typeof saveRouteData === 'function') await saveRouteData(data);
+      try {
+        if (typeof routeRecordings !== 'undefined') routeRecordings[data.segment] = data;
+      } catch (e) {}
+
+      cloudCovered.add(data.segment);
+      resetDraft();
+      await fetchCoverage();
+      setPage('list');
+    } catch (e) {
+      console.error('route upload failed', e);
+      const status = document.getElementById('recStatus');
+      if (status) status.textContent = '❌ ההעלאה לענן נכשלה. נסה שוב.';
+    } finally {
+      busy = false;
+      paint();
+    }
+  }
+
+  function isRecording() {
+    const b = document.getElementById('recordButton');
+    return !!b && /סיים/.test(b.textContent || '');
+  }
+
+  function recordingFinished() {
     const exportBtn = document.getElementById('exportButton');
-    const step2Next = document.getElementById('wizardStep2Next');
-    const recording = !!record && /סיים/.test(record.textContent || '');
-    const hasFinishedRecording = !!exportBtn && !exportBtn.disabled;
-    if (step2Next) {
-      step2Next.disabled = !hasFinishedRecording;
-      const wanted = recording ? 'קודם מסיימים את ההקלטה' : hasFinishedRecording ? 'סיימתי את המקטע — המשך ←' : 'התחל וסיים הקלטה כדי להמשיך';
-      if (step2Next.textContent !== wanted) step2Next.textContent = wanted;
+    return !!exportBtn && !exportBtn.disabled && !isRecording();
+  }
+
+  function paint() {
+    const list = document.getElementById('wizardSegmentList');
+    const items = segments();
+    if (list) {
+      list.innerHTML = '';
+      for (const s of items) {
+        const covered = cloudCovered.has(s.value);
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'wizard-segment-row' + (covered ? ' covered' : '');
+        b.innerHTML = `<span class="name">${s.label}</span><span class="state">${covered ? '✅ מכוסה בענן' : '○ עדיין לא הוקלט'}</span>`;
+        b.addEventListener('click', () => selectSegment(s.value));
+        list.appendChild(b);
+      }
     }
-    const liveHint = document.getElementById('wizardLiveHint');
-    if (liveHint) {
-      const wanted = recording ? '🟢 ההקלטה פעילה. הולכים במסלול, ובכל מקום חשוב לוחצים “סמן נקודה”. אחרי הסימון אפשר לצרף תמונה.' : hasFinishedRecording ? '✅ ההקלטה הסתיימה. עכשיו בודקים ושומרים את המקטע.' : 'לחץ “התחל הקלטה”, המתן ל-GPS, ואז צא לדרך.';
-      if (liveHint.textContent !== wanted) liveHint.textContent = wanted;
+
+    const summary = document.getElementById('wizardCoverageSummary');
+    const coveredCount = items.filter(s => cloudCovered.has(s.value)).length;
+    if (summary) {
+      summary.textContent = items.length ? `${coveredCount} מתוך ${items.length} מקטעים מכוסים בענן` : 'אין מקטעים מוגדרים';
+      summary.classList.toggle('complete', items.length > 0 && coveredCount === items.length);
     }
-    paintSegmentContext();
+
+    document.querySelectorAll('#recorder [data-segment-name]').forEach(n => n.textContent = currentSegment().label);
+    const upload = document.getElementById('wizardUploadButton');
+    if (upload) {
+      upload.disabled = busy || !recordingFinished();
+      upload.classList.toggle('uploading', busy);
+      upload.textContent = busy ? '☁️ מעלה לענן…' : isRecording() ? 'קודם מסיימים את ההקלטה' : recordingFinished() ? '☁️ סיים מקטע והעלה לענן' : 'התחל וסיים הקלטה כדי להעלות';
+    }
+
+    const hint = document.getElementById('wizardLiveHint');
+    if (hint) hint.textContent = isRecording()
+      ? '🟢 ההקלטה פעילה. בכל מקום חשוב לחץ “סמן נקודה”, ואפשר לצרף תמונות.'
+      : recordingFinished()
+        ? '✅ ההקלטה הסתיימה. לחץ למטה כדי להעלות את המקטע לענן ולסמן אותו כמכוסה.'
+        : 'לחץ “התחל הקלטה”, המתן ל-GPS ואז צא לדרך.';
+
+    const state = document.getElementById('routeDataState');
+    if (state && items.length) state.textContent = `☁️ ${coveredCount}/${items.length} מקטעים מכוסים בענן`;
   }
 
   function build() {
     const recorder = document.getElementById('recorder');
     const header = recorder?.querySelector('.parent-header');
-    if (!recorder || !header || recorder.dataset.wizard === '1') return false;
+    if (!recorder || !header || recorder.dataset.genericWizard === '1') return false;
+
     const priority = recorder.querySelector('.parent-priority-status');
     const routeSection = [...recorder.querySelectorAll('.parent-section')].find(s => s.querySelector('#segmentSelect'));
     const statusSection = [...recorder.querySelectorAll('.parent-section')].find(s => s.querySelector('.rec-panel'));
@@ -157,55 +222,71 @@
     const photoInput = document.getElementById('photoInput');
     const routeFilesInput = document.getElementById('routeFilesInput');
     if (!routeSection || !statusSection || !recordSection || !dataSection) return false;
-    recorder.dataset.wizard = '1'; addStyles();
+
+    recorder.dataset.genericWizard = '1';
+    recorder.dataset.wizard = '1';
+    addStyles();
 
     const wizard = document.createElement('div'); wizard.className = 'parent-wizard';
-    const progress = document.createElement('div'); progress.className = 'wizard-progress';
-    ['1. בוחרים מקטע', '2. מקליטים ומצלמים', '3. בודקים ושומרים'].forEach((text, i) => {
-      const c = button(text, 'wizard-step-chip', () => { if (i + 1 < currentStep) setStep(i + 1); }); progress.appendChild(c);
+
+    const listPage = document.createElement('section');
+    listPage.className = 'wizard-page active'; listPage.dataset.page = 'list';
+    listPage.innerHTML = '<div class="wizard-page-title">מקטעי המסלול</div><div class="wizard-help">בחר מקטע לעבודה. מקטע שמסומן בירוק כבר שמור בענן. אפשר לפתוח אותו שוב, להקליט מחדש ולעדכן את הגרסה בענן.</div><div id="wizardCoverageSummary" class="wizard-summary"></div><div id="wizardSegmentList" class="wizard-segment-list"></div>';
+
+    const recordPage = document.createElement('section');
+    recordPage.className = 'wizard-page'; recordPage.dataset.page = 'record';
+    recordPage.innerHTML = '<div class="wizard-page-title">הקלטת מקטע</div><div class="wizard-current-segment"><div class="kicker">עובדים עכשיו על</div><div class="name" data-segment-name></div></div><div id="wizardLiveHint" class="wizard-help"></div>';
+    recordPage.appendChild(statusSection);
+    recordPage.appendChild(recordSection);
+    const nav = document.createElement('div'); nav.className = 'wizard-nav';
+    const back = document.createElement('button'); back.type='button'; back.className='secondary'; back.textContent='→ חזרה לרשימת המקטעים'; back.onclick=()=>{ if(!isRecording()){ resetDraft(); setPage('list'); } };
+    const upload = document.createElement('button'); upload.id='wizardUploadButton'; upload.type='button'; upload.className='primary wizard-upload'; upload.onclick=uploadCurrent;
+    nav.append(back, upload); recordPage.appendChild(nav);
+
+    wizard.append(listPage, recordPage);
+
+    const maintenance = document.createElement('details'); maintenance.className='wizard-maintenance parent-section';
+    const summary = document.createElement('summary'); summary.textContent='כלים מתקדמים ותחזוקה';
+    const body = document.createElement('div'); body.className='wizard-maintenance-body';
+    const dataTools = dataSection.querySelector('.route-data-tools');
+    if (dataTools) {
+      const loadBtn = dataTools.querySelector('button.secondary');
+      if (loadBtn) loadBtn.textContent = '📂 טען קבצי הקלטה';
+      body.appendChild(dataTools);
+    }
+    if (danger) body.appendChild(danger);
+    maintenance.append(summary, body);
+
+    const select = document.getElementById('segmentSelect');
+    if (select) recorder.appendChild(select);
+    if (photoInput) recorder.appendChild(photoInput);
+    if (routeFilesInput) recorder.appendChild(routeFilesInput);
+    document.getElementById('exportButton')?.remove();
+    routeSection.remove();
+    if (dataSection.isConnected) dataSection.remove();
+
+    priority?.insertAdjacentElement('afterend', wizard) || header.insertAdjacentElement('afterend', wizard);
+    wizard.insertAdjacentElement('afterend', maintenance);
+
+    const observer = new MutationObserver(() => paint());
+    ['recordButton','recStatus','recPoints','recTime'].forEach(id => {
+      const node = document.getElementById(id);
+      if (node) observer.observe(node, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['disabled'] });
     });
-    wizard.appendChild(progress);
+    document.getElementById('recordButton')?.addEventListener('click',()=>setTimeout(paint,80));
+    document.getElementById('landmarkButton')?.addEventListener('click',()=>setTimeout(paint,80));
 
-    const segProgress = document.createElement('div'); segProgress.className = 'wizard-segment-progress';
-    ['1','2','3','4'].forEach((n,i) => { const x=document.createElement('div'); x.className='wizard-segment-pill'; x.textContent=`מקטע ${n}`; segProgress.appendChild(x); });
-    wizard.appendChild(segProgress);
-
-    const p1 = document.createElement('section'); p1.className = 'wizard-page active';
-    p1.innerHTML = '<div class="wizard-page-title">שלב 1 — איזה חלק של הדרך מקליטים?</div><div class="wizard-help">בחר מקטע אחד בלבד. בסיום כל מקטע נעביר אותך אוטומטית למקטע הבא.</div>';
-    p1.appendChild(routeSection);
-    const nav1 = document.createElement('div'); nav1.className = 'wizard-nav single'; nav1.appendChild(button('המשך להקלטה ←', 'primary', () => setStep(2))); p1.appendChild(nav1);
-
-    const p2 = document.createElement('section'); p2.className = 'wizard-page';
-    p2.innerHTML = '<div class="wizard-page-title">שלב 2 — מקליטים את הדרך</div><div class="wizard-current-segment"><div class="kicker">המקטע הנוכחי</div><div class="name" data-segment-name></div></div><div id="wizardLiveHint" class="wizard-help">לחץ “התחל הקלטה”, המתן ל-GPS, ואז צא לדרך.</div>';
-    p2.appendChild(statusSection); p2.appendChild(recordSection);
-    const nav2 = document.createElement('div'); nav2.className = 'wizard-nav';
-    nav2.appendChild(button('→ חזרה לבחירת מקטע', 'secondary', () => setStep(1)));
-    const next2 = button('התחל וסיים הקלטה כדי להמשיך', 'primary', () => setStep(3)); next2.id='wizardStep2Next'; next2.disabled=true; nav2.appendChild(next2); p2.appendChild(nav2);
-
-    const p3 = document.createElement('section'); p3.className = 'wizard-page';
-    p3.innerHTML = '<div class="wizard-page-title">שלב 3 — בדיקה ושמירה</div><div class="wizard-current-segment"><div class="kicker">סיימת להקליט</div><div class="name" data-segment-name></div></div><div class="wizard-help">בדוק את הנקודות והתמונות. כפתור “שמור קובץ הקלטה” יוצר גיבוי JSON של המקטע הזה.</div>';
-    const exportBtn = document.getElementById('exportButton'); if (exportBtn) p3.appendChild(exportBtn);
-    const nextCard=document.createElement('div'); nextCard.id='wizardNextCard'; nextCard.className='wizard-next-card'; p3.appendChild(nextCard);
-    const nav3=document.createElement('div'); nav3.className='wizard-nav'; nav3.appendChild(button('→ חזרה להקלטה','secondary',()=>setStep(2)));
-    const nextSegment=button('המשך למקטע הבא ←','primary',goNextSegment); nextSegment.id='wizardNextSegmentButton'; nav3.appendChild(nextSegment); p3.appendChild(nav3);
-    wizard.append(p1,p2,p3);
-
-    const maintenance=document.createElement('details'); maintenance.className='wizard-maintenance parent-section';
-    const summary=document.createElement('summary'); summary.textContent='כלים מתקדמים ותחזוקה';
-    const maintenanceBody=document.createElement('div'); maintenanceBody.className='wizard-maintenance-body';
-    const dataTools=dataSection.querySelector('.route-data-tools'); if(dataTools)maintenanceBody.appendChild(dataTools); if(danger)maintenanceBody.appendChild(danger); maintenance.append(summary,maintenanceBody);
-    if(photoInput)recorder.appendChild(photoInput); if(routeFilesInput)recorder.appendChild(routeFilesInput);
-    if(dataSection.isConnected && !dataSection.contains(exportBtn) && !dataSection.querySelector('.route-data-tools')) dataSection.remove();
-    priority?.insertAdjacentElement('afterend',wizard)||header.insertAdjacentElement('afterend',wizard); wizard.insertAdjacentElement('afterend',maintenance);
-
-    const observer=new MutationObserver(()=>refreshState());
-    ['recordButton','recStatus','recPoints','recTime'].forEach(id=>{const node=document.getElementById(id);if(node)observer.observe(node,{childList:true,subtree:true,characterData:true})});
-    document.getElementById('recordButton')?.addEventListener('click',()=>setTimeout(refreshState,50));
-    document.getElementById('landmarkButton')?.addEventListener('click',()=>setTimeout(refreshState,50));
-    document.getElementById('segmentSelect')?.addEventListener('change',paintSegmentContext);
-    refreshState(); return true;
+    fetchCoverage();
+    paint();
+    return true;
   }
 
-  function install(){if(build())return;let tries=0;const timer=setInterval(()=>{tries++;if(build()||tries>40)clearInterval(timer)},100)}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+  function install() {
+    if (build()) return;
+    let tries = 0;
+    const timer = setInterval(() => { tries++; if (build() || tries > 40) clearInterval(timer); }, 100);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+  else install();
 })();
