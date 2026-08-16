@@ -8,10 +8,15 @@
     @keyframes gpsPulse{0%,100%{opacity:1}50%{opacity:.35}}
     @media (prefers-reduced-motion:reduce){#gpsQualityIndicator .gps-dot{animation:none}}
   `;document.head.appendChild(s)}
-  function ensure(){let d=document.getElementById('gpsQualityIndicator');if(!d){d=document.createElement('div');d.id='gpsQualityIndicator';d.className='bad';d.setAttribute('aria-label','מצב GPS');d.innerHTML='<span class="gps-label">GPS</span><span class="gps-dot"></span>'}const controls=document.querySelector('#homeTopPanel .top-controls');if(controls&&d.parentElement!==controls)controls.insertBefore(d,controls.firstChild);else if(!d.isConnected)document.body.appendChild(d);return d}
+  function targetControls(){
+    const tripVisible=!document.getElementById('trip')?.classList.contains('hidden');
+    if(tripVisible)return document.querySelector('#tripTopPanel .top-controls');
+    return document.querySelector('#homeTopPanel .top-controls');
+  }
+  function ensure(){let d=document.getElementById('gpsQualityIndicator');if(!d){d=document.createElement('div');d.id='gpsQualityIndicator';d.className='bad';d.setAttribute('aria-label','מצב GPS');d.innerHTML='<span class="gps-label">GPS</span><span class="gps-dot"></span>'}const controls=targetControls();if(controls&&d.parentElement!==controls)controls.insertBefore(d,controls.firstChild);else if(!d.isConnected)document.body.appendChild(d);return d}
   function setQuality(q){const d=ensure();d.className=q}
   function onPosition(pos){const accuracy=Number(pos?.coords?.accuracy)||999;lastGoodAt=Date.now();if(accuracy<=25)setQuality('good');else if(accuracy<=60)setQuality('medium');else setQuality('bad')}
   function onError(){setQuality('bad')}
-  function boot(){addStyles();ensure();if(!navigator.geolocation)return;if(watchId==null)watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});setInterval(()=>{ensure();if(!lastGoodAt||Date.now()-lastGoodAt>20000)setQuality('bad')},1000)}
+  function boot(){addStyles();ensure();if(!navigator.geolocation)return;if(watchId==null)watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});setInterval(()=>{ensure();if(!lastGoodAt||Date.now()-lastGoodAt>20000)setQuality('bad')},500)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,50));else setTimeout(boot,50);
 })();
