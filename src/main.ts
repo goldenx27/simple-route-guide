@@ -25,7 +25,7 @@ export default {
     const html = await response.text(); let injected = html;
     if (!injected.includes('rel="manifest"')) injected = injected.replace('</head>', `${PWA_HEAD}</head>`);
     const scripts = [
-      '/push-client.js','/bus-gps.js','/bus-auto-ui.js','/exit-app.js','/map-follow.js','/walk-map.js','/map-heading-fix.js','/keep-awake.js','/recovery-sync.js','/sound-ui.js','/route-cloud-sync.js','/layout-v3.js','/parent-ui-priority.js','/parent-wizard.js','/parent-test-mode.js','/recorder-state-sentinel.js','/recording-start-fix.js','/recorder-runtime-fix.js','/remove-legacy-route-loader.js','/remove-legacy-clear-recording.js'
+      '/push-client.js','/bus-gps.js','/bus-auto-ui.js','/exit-app.js','/arrival-gps.js','/map-follow.js','/walk-map.js','/map-heading-fix.js','/keep-awake.js','/recovery-sync.js','/sound-ui.js','/route-cloud-sync.js','/layout-v3.js','/parent-ui-priority.js','/parent-wizard.js','/parent-test-mode.js','/recorder-state-sentinel.js','/recording-start-fix.js','/recorder-runtime-fix.js','/remove-legacy-route-loader.js','/remove-legacy-clear-recording.js'
     ];
     for (const src of scripts) if (!injected.includes(src)) injected = injected.replace('</body>', `<script src="${src}"></script></body>`);
     const headers = new Headers(response.headers); headers.delete('content-length'); headers.set('cache-control','no-cache');
