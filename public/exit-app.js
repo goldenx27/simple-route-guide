@@ -4,7 +4,9 @@
     const s = document.createElement('style');
     s.id = 'exitAppStyles';
     s.textContent = `
-      #exitAppButton{margin-top:2px;background:#f1f3f5;color:#52606d;min-height:48px}
+      #home{position:relative}
+      #exitAppButton{position:absolute;top:0;right:0;z-index:8;width:42px;height:42px;min-height:42px;margin:0;padding:0;border-radius:13px;background:#f1f3f5;color:#52606d;font-size:1.15rem;display:flex;align-items:center;justify-content:center;box-shadow:none}
+      #exitAppButton.hidden{display:none!important}
       #exitAppDialogBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
       #exitAppDialogBackdrop.hidden{display:none!important}
       .exit-app-dialog{width:min(100%,360px);background:#fff;border-radius:22px;padding:20px;box-shadow:0 18px 60px rgba(0,0,0,.25);display:grid;gap:16px;text-align:center}
@@ -18,7 +20,6 @@
   function closeApplication() {
     try { window.close(); } catch (e) {}
     setTimeout(() => {
-      // Installed PWAs may reject window.close(). Fall back to leaving the app's page.
       try {
         if (history.length > 1) history.back();
         else location.replace('about:blank');
@@ -26,10 +27,7 @@
     }, 120);
   }
 
-  function showDialog() {
-    const backdrop = document.getElementById('exitAppDialogBackdrop');
-    backdrop?.classList.remove('hidden');
-  }
+  function showDialog() { document.getElementById('exitAppDialogBackdrop')?.classList.remove('hidden'); }
   function hideDialog() { document.getElementById('exitAppDialogBackdrop')?.classList.add('hidden'); }
 
   function installDialog() {
@@ -49,13 +47,16 @@
 
   function installButton() {
     const home = document.getElementById('home');
-    const actions = home?.querySelector('.actions');
-    if (!actions) return false;
+    if (!home) return false;
     let b = document.getElementById('exitAppButton');
     if (!b) {
-      b = document.createElement('button'); b.id = 'exitAppButton'; b.type = 'button';
-      b.textContent = '🚪 סגירת האפליקציה'; b.onclick = showDialog;
-      actions.appendChild(b);
+      b = document.createElement('button');
+      b.id = 'exitAppButton'; b.type = 'button';
+      b.textContent = '✕';
+      b.setAttribute('aria-label', 'סגירת האפליקציה');
+      b.title = 'סגירת האפליקציה';
+      b.onclick = showDialog;
+      home.appendChild(b);
     }
     return true;
   }
