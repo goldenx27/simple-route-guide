@@ -5,7 +5,8 @@
     s.id = 'exitAppStyles';
     s.textContent = `
       #home{position:relative}
-      #exitAppButton{position:absolute;top:0;right:0;z-index:8;width:42px;height:42px;min-height:42px;margin:0;padding:0;border-radius:13px;background:#f1f3f5;color:#52606d;font-size:1.15rem;display:flex;align-items:center;justify-content:center;box-shadow:none}
+      #exitAppButton{position:absolute;top:2px;right:0;z-index:8;width:36px;height:36px;min-height:36px;margin:0;padding:0;border-radius:12px;background:#f1f3f5;color:#8b96a3;font-size:1rem;font-weight:500;display:flex;align-items:center;justify-content:center;box-shadow:none;transition:none}
+      #exitAppButton:hover,#exitAppButton:focus,#exitAppButton:active{background:#f1f3f5;color:#8b96a3;box-shadow:none;transform:none;outline:none}
       #exitAppButton.hidden{display:none!important}
       #exitAppDialogBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
       #exitAppDialogBackdrop.hidden{display:none!important}
