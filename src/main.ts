@@ -40,6 +40,12 @@ export default {
     if (!injected.includes('/bus-gps.js')) {
       injected = injected.replace('</body>', '<script src="/bus-gps.js"></script></body>');
     }
+    if (!injected.includes('/bus-auto-ui.js')) {
+      injected = injected.replace('</body>', '<script src="/bus-auto-ui.js"></script></body>');
+    }
+    if (!injected.includes('/exit-app.js')) {
+      injected = injected.replace('</body>', '<script src="/exit-app.js"></script></body>');
+    }
     if (!injected.includes('/recovery-sync.js')) {
       injected = injected.replace('</body>', '<script src="/recovery-sync.js"></script></body>');
     }
