@@ -1,8 +1,8 @@
 (()=>{
   let watchId=null,lastGoodAt=0;
   function addStyles(){if(document.getElementById('gpsIndicatorStyles'))return;const s=document.createElement('style');s.id='gpsIndicatorStyles';s.textContent=`
-    #gpsQualityIndicator{position:fixed;top:14px;left:18px;z-index:120;width:58px;height:58px;border-radius:18px;background:#f1f3f5;box-shadow:0 4px 14px rgba(30,41,59,.10);pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#66717f;font:600 10px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-sizing:border-box}
-    #gpsQualityIndicator .gps-label{font-size:10px;letter-spacing:.15px;line-height:1;color:#66717f}
+    #gpsQualityIndicator{position:fixed;top:18px;left:10px;z-index:120;width:48px;height:48px;border-radius:15px;background:#f1f3f5;box-shadow:0 3px 10px rgba(30,41,59,.09);pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#66717f;font:600 9px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-sizing:border-box}
+    #gpsQualityIndicator .gps-label{font-size:9px;letter-spacing:.1px;line-height:1;color:#66717f}
     #gpsQualityIndicator .gps-dot{width:12px;height:12px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.25);box-sizing:border-box;animation:gpsPulse 1s ease-in-out infinite}
     #gpsQualityIndicator.good .gps-dot{background:#22c55e}#gpsQualityIndicator.medium .gps-dot{background:#f59e0b}#gpsQualityIndicator.bad .gps-dot{background:#ef4444}
     @keyframes gpsPulse{0%,100%{opacity:1}50%{opacity:.35}}
