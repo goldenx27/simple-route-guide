@@ -12,8 +12,11 @@
     .maor-dot{width:26px;height:26px;border-radius:50%;background:#1677ff;border:4px solid white;box-shadow:0 2px 8px rgba(0,0,0,.35)}
     .route-signal{font-size:22px;filter:drop-shadow(0 1px 2px white)}
     #trip .content{position:relative}
-    #trip .landmark-feedback{z-index:25;top:8px;left:8px;width:142px;background:rgba(255,255,255,.97);box-shadow:0 10px 28px rgba(0,0,0,.2)}
-    #trip .landmark-feedback img{width:126px;height:110px}
+    #trip .landmark-feedback{z-index:25;top:8px;left:50%;transform:translateX(-50%);width:min(78vw,340px);padding:10px;background:rgba(255,255,255,.98);box-shadow:0 12px 34px rgba(0,0,0,.24);border-radius:20px}
+    #trip .landmark-feedback img{width:100%;height:min(42vw,230px);min-height:180px;object-fit:cover;border-radius:14px;display:block}
+    #trip .landmark-feedback .ok{font-size:.9rem;margin-top:8px}
+    #trip .landmark-feedback .where{font-size:.78rem;margin-top:5px}
+    #trip .landmark-dots{margin-top:6px}
     #routeStartNotice{position:absolute;z-index:50;left:10px;right:10px;bottom:10px;background:#fff;border-radius:16px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);text-align:center;font-weight:800;direction:rtl}
   `;document.head.appendChild(s)}
   function loadLeaflet(){if(window.L)return Promise.resolve();if(leafletLoading)return leafletLoading;leafletLoading=new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);const js=document.createElement('script');js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';js.onload=resolve;js.onerror=reject;document.head.appendChild(js)});return leafletLoading}
@@ -33,7 +36,6 @@
     const box=document.getElementById('walkMiniMap');box.classList.remove('hidden');
     clearRouteLines();
     const coords=pts.map(p=>[p.lat,p.lon]);
-    // White casing keeps the route readable even over a detailed street tile.
     routeHalo=L.polyline(coords,{weight:13,opacity:.92,color:'#fff',lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
     routeLine=L.polyline(coords,{weight:7,opacity:.95,color:'#1677ff',lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
     const near=nearest(here,pts);
