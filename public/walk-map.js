@@ -15,13 +15,19 @@
     html body #trip .content{position:relative!important;overflow:hidden!important;justify-content:flex-end!important;gap:10px!important}
     html body #trip .content #landmarkFeedback{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:100%!important;max-width:100%!important;height:230px!important;min-height:230px!important;max-height:230px!important;flex:0 0 230px!important;order:1!important;padding:8px!important;margin:0!important;background:#fff!important;border:2px solid #b9e7c7!important;border-radius:18px!important;box-shadow:0 5px 18px rgba(0,0,0,.10)!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;justify-content:flex-start!important;box-sizing:border-box!important}
     html body #trip .content #landmarkFeedback.hidden{display:none!important}
-    html body #trip .content #landmarkFeedback img{display:block!important;width:100%!important;height:165px!important;min-height:0!important;max-height:165px!important;object-fit:cover!important;border-radius:13px!important;flex:0 0 165px!important}
+    #landmarkFeedback .landmark-all-photos{height:165px;display:grid;gap:5px;grid-template-columns:1fr;grid-template-rows:1fr;direction:ltr;overflow:hidden;border-radius:13px;flex:0 0 165px}
+    #landmarkFeedback .landmark-all-photos.count-2{grid-template-columns:1fr 1fr}
+    #landmarkFeedback .landmark-all-photos.count-3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+    #landmarkFeedback .landmark-all-photos.count-3 img:first-child{grid-row:1 / span 2}
+    #landmarkFeedback .landmark-all-photos.count-4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+    #landmarkFeedback .landmark-all-photos.count-many{grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr}
+    html body #trip .content #landmarkFeedback .landmark-all-photos img{display:block!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;object-fit:cover!important;border-radius:8px!important;flex:none!important}
     html body #trip .content #landmarkFeedback .ok{font-size:.86rem!important;line-height:1.15!important;margin-top:6px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
     html body #trip .content #landmarkFeedback .where{font-size:.72rem!important;line-height:1.15!important;margin-top:3px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-    html body #trip .content #landmarkFeedback .landmark-dots{margin-top:4px!important;flex:0 0 auto!important}
+    html body #trip .content #landmarkFeedback .landmark-dots{display:none!important}
     html body #trip .content>.card{order:3!important;flex:0 0 auto!important}
     #routeStartNotice{position:absolute;z-index:50;left:10px;right:10px;bottom:10px;background:#fff;border-radius:16px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);text-align:center;font-weight:800;direction:rtl}
-    @media(max-height:760px){#walkMiniMap{height:195px;flex-basis:195px}html body #trip .content #landmarkFeedback{height:195px!important;min-height:195px!important;max-height:195px!important;flex-basis:195px!important}html body #trip .content #landmarkFeedback img{height:132px!important;max-height:132px!important;flex-basis:132px!important}}
+    @media(max-height:760px){#walkMiniMap{height:195px;flex-basis:195px}html body #trip .content #landmarkFeedback{height:195px!important;min-height:195px!important;max-height:195px!important;flex-basis:195px!important}#landmarkFeedback .landmark-all-photos{height:132px;flex-basis:132px}}
   `;document.head.appendChild(s)}
   function loadLeaflet(){if(window.L)return Promise.resolve();if(leafletLoading)return leafletLoading;leafletLoading=new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);const js=document.createElement('script');js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';js.onload=resolve;js.onerror=reject;document.head.appendChild(js)});return leafletLoading}
   function point(p){return p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))?{lat:Number(p.lat),lon:Number(p.lon)}:null}
@@ -39,7 +45,17 @@
   function clearRouteLines(){for(const l of [routeHalo,routeLine,passedLine])if(l)l.remove();routeHalo=routeLine=passedLine=null}
   function rotateMap(){const pane=document.querySelector('#walkMiniMap .leaflet-map-pane');if(pane)pane.style.rotate=`${-heading}deg`}
   function hideLandmarkAndRestoreMap(){landmarkVisible=false;clearTimeout(landmarkTimer);landmarkTimer=null;document.getElementById('landmarkFeedback')?.classList.add('hidden');const box=document.getElementById('walkMiniMap');if(box&&current?.step?.type==='walk'){box.classList.remove('hidden');setTimeout(()=>map?.invalidateSize(false),30)}}
-  function showLandmarkTemporarily(lm){landmarkVisible=true;window.renderLandmarkFeedback?.(lm);document.getElementById('walkMiniMap')?.classList.add('hidden');clearTimeout(landmarkTimer);landmarkTimer=setTimeout(hideLandmarkAndRestoreMap,LANDMARK_SHOW_MS)}
+  function showLandmarkTemporarily(lm){
+    const photos=Array.isArray(lm?.photos)?lm.photos.filter(Boolean):[];if(!photos.length)return;
+    landmarkVisible=true;
+    if(typeof landmarkSlideTimer!=='undefined'&&landmarkSlideTimer){clearInterval(landmarkSlideTimer);landmarkSlideTimer=null}
+    const box=document.getElementById('landmarkFeedback');if(!box)return;
+    const countClass=photos.length===1?'count-1':photos.length===2?'count-2':photos.length===3?'count-3':photos.length===4?'count-4':'count-many';
+    box.innerHTML=`<div class="landmark-all-photos ${countClass}">${photos.map((src,i)=>`<img src="${src}" alt="${(lm.name||'נקודת ציון').replace(/"/g,'&quot;')} ${i+1}"/>`).join('')}</div><div class="ok">✅ אתה בדרך הנכונה</div><div class="where">${lm.name||'המקום שסימנתם'}</div>`;
+    box.classList.remove('hidden');
+    document.getElementById('walkMiniMap')?.classList.add('hidden');
+    clearTimeout(landmarkTimer);landmarkTimer=setTimeout(hideLandmarkAndRestoreMap,LANDMARK_SHOW_MS)
+  }
   function showNearbyLandmark(here,accuracy){const seg=typeof segmentForCurrentStep==='function'?segmentForCurrentStep():null,rec=seg&&routeRecordings[seg];if(!rec)return;let best=null,dist=Infinity;for(const lm of rec.landmarks||[]){if(!lm.photos?.length)continue;const d=distanceMeters(here,lm);if(d<dist){best=lm;dist=d}}const threshold=Math.max(24,Math.min(50,(accuracy||12)+18));if(best&&dist<=threshold){const key=`${seg}:${best.name}:${best.lat}:${best.lon}`;if(key!==lastLandmarkKey){lastLandmarkKey=key;showLandmarkTemporarily({...best,distance_m:Math.round(dist)})}}else if(dist>threshold+25)lastLandmarkKey=''}
   async function paintMap(here){if(current?.step?.type!=='walk')return;if(landmarkVisible)return;const pts=activeWalkPoints();if(pts.length<2)return;await ensureMap();const box=document.getElementById('walkMiniMap');box.classList.remove('hidden');clearRouteLines();const coords=pts.map(p=>[p.lat,p.lon]);routeHalo=L.polyline(coords,{weight:13,opacity:.92,color:'#fff',lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);routeLine=L.polyline(coords,{weight:7,opacity:.95,color:'#1677ff',lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);const near=nearest(here,pts);if(near.index>0){const passed=pts.slice(0,near.index+1).map(p=>[p.lat,p.lon]);passedLine=L.polyline(passed,{weight:7,opacity:.95,color:'#6b7280',lineCap:'round',lineJoin:'round',interactive:false}).addTo(map)}if(!userMarker)userMarker=L.marker([here.lat,here.lon],{icon:markerIcon(),interactive:false,zIndexOffset:1000}).addTo(map);else userMarker.setLatLng([here.lat,here.lon]);map.setView([here.lat,here.lon],18,{animate:false});rotateMap();setTimeout(()=>map.invalidateSize(false),20);fetchSignals(pts)}
   function onMapPosition(pos){if((pos.coords.accuracy||999)>80)return;const here={lat:pos.coords.latitude,lon:pos.coords.longitude};if(lastFix){const moved=distanceMeters(lastFix,here);if(moved>250)return;if(moved>=4){const b=bearing(lastFix,here),delta=((b-heading+540)%360)-180;heading=(heading+delta*.35+360)%360}}lastFix=here;showNearbyLandmark(here,pos.coords.accuracy);paintMap(here).catch(()=>{})}
