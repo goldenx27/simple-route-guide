@@ -7,18 +7,21 @@
   let map=null,userMarker=null,routeHalo=null,routeLine=null,passedLine=null,signalLayer=null,mapWatch=null,lastFix=null,leafletLoading=null,signalsKey='',heading=0,lastLandmarkKey='';
 
   function addStyles(){if(document.getElementById('walkMapStyles'))return;const s=document.createElement('style');s.id='walkMapStyles';s.textContent=`
-    #walkMiniMap{height:210px;border-radius:18px;overflow:hidden;margin:0 0 10px;direction:ltr;background:#edf1f4;box-shadow:inset 0 0 0 1px #dfe5ea;position:relative}
+    #walkMiniMap{height:210px;border-radius:18px;overflow:hidden;margin:0;direction:ltr;background:#edf1f4;box-shadow:inset 0 0 0 1px #dfe5ea;position:relative;flex:0 0 210px;order:1}
     #walkMiniMap.hidden{display:none!important}.leaflet-control-attribution{font-size:8px!important;opacity:.55}.leaflet-control-zoom{display:none}
     #walkMiniMap .leaflet-map-pane{transform-origin:50% 50%;transition:rotate .35s linear}
     .maor-dot{width:26px;height:26px;border-radius:50%;background:#1677ff;border:4px solid white;box-shadow:0 2px 8px rgba(0,0,0,.35)}
     .route-signal{font-size:22px;filter:drop-shadow(0 1px 2px white)}
-    #trip .content{position:relative}
-    #trip .landmark-feedback{z-index:25;top:8px;left:50%;transform:translateX(-50%);width:min(78vw,340px);padding:10px;background:rgba(255,255,255,.98);box-shadow:0 12px 34px rgba(0,0,0,.24);border-radius:20px}
-    #trip .landmark-feedback img{width:100%;height:min(42vw,230px);min-height:180px;object-fit:cover;border-radius:14px;display:block}
-    #trip .landmark-feedback .ok{font-size:.9rem;margin-top:8px}
-    #trip .landmark-feedback .where{font-size:.78rem;margin-top:5px}
-    #trip .landmark-dots{margin-top:6px}
+    html body #trip .content{position:relative!important;overflow:hidden!important;justify-content:flex-end!important;gap:10px!important}
+    html body #trip .content #landmarkFeedback{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:100%!important;max-width:100%!important;height:auto!important;min-height:0!important;max-height:245px!important;flex:0 0 auto!important;order:2!important;padding:8px!important;margin:0!important;background:#fff!important;border:2px solid #b9e7c7!important;border-radius:18px!important;box-shadow:0 5px 18px rgba(0,0,0,.10)!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;justify-content:flex-start!important;box-sizing:border-box!important}
+    html body #trip .content #landmarkFeedback.hidden{display:none!important}
+    html body #trip .content #landmarkFeedback img{display:block!important;width:100%!important;height:170px!important;min-height:0!important;max-height:170px!important;object-fit:cover!important;border-radius:13px!important;flex:0 0 170px!important}
+    html body #trip .content #landmarkFeedback .ok{font-size:.86rem!important;line-height:1.15!important;margin-top:6px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    html body #trip .content #landmarkFeedback .where{font-size:.72rem!important;line-height:1.15!important;margin-top:3px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    html body #trip .content #landmarkFeedback .landmark-dots{margin-top:4px!important;flex:0 0 auto!important}
+    html body #trip .content>.card{order:3!important;flex:0 0 auto!important}
     #routeStartNotice{position:absolute;z-index:50;left:10px;right:10px;bottom:10px;background:#fff;border-radius:16px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);text-align:center;font-weight:800;direction:rtl}
+    @media(max-height:760px){#walkMiniMap{height:180px;flex-basis:180px}html body #trip .content #landmarkFeedback{max-height:205px!important}html body #trip .content #landmarkFeedback img{height:135px!important;max-height:135px!important;flex-basis:135px!important}}
   `;document.head.appendChild(s)}
   function loadLeaflet(){if(window.L)return Promise.resolve();if(leafletLoading)return leafletLoading;leafletLoading=new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);const js=document.createElement('script');js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';js.onload=resolve;js.onerror=reject;document.head.appendChild(js)});return leafletLoading}
   function point(p){return p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))?{lat:Number(p.lat),lon:Number(p.lon)}:null}
