@@ -28,20 +28,20 @@
 
   function hebrewVoice() {
     if (!('speechSynthesis' in window)) return null;
-    const voices = speechSynthesis.getVoices?.() || [];
+    const voices = window.speechSynthesis.getVoices?.() || [];
     return voices.find(v => /^he(-|_)/i.test(v.lang || '')) || voices.find(v => /hebrew/i.test(v.name || '')) || null;
   }
 
   function primeSpeech() {
     if (speechPrimed || !soundEnabled || !('speechSynthesis' in window)) return;
     try {
-      speechSynthesis.resume?.();
+      window.speechSynthesis.resume?.();
       const u = new SpeechSynthesisUtterance(' ');
       u.lang = 'he-IL';
       u.volume = 0.01;
       u.rate = 2;
       const v = hebrewVoice(); if (v) u.voice = v;
-      speechSynthesis.speak(u);
+      window.speechSynthesis.speak(u);
       speechPrimed = true;
     } catch (e) {}
   }
@@ -49,8 +49,8 @@
   function reliableSpeak(text) {
     if (!soundEnabled || !text || !('speechSynthesis' in window)) return;
     try {
-      speechSynthesis.cancel();
-      speechSynthesis.resume?.();
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume?.();
       const spoken = String(text).replace(/שטמפפר/g,'Shtampeper');
       const make = () => {
         const u = new SpeechSynthesisUtterance(spoken);
@@ -61,11 +61,11 @@
         const v = hebrewVoice(); if (v) u.voice = v;
         return u;
       };
-      speechSynthesis.speak(make());
+      window.speechSynthesis.speak(make());
       setTimeout(() => {
         if (!soundEnabled) return;
-        if (!speechSynthesis.speaking && !speechSynthesis.pending) {
-          try { speechSynthesis.resume?.(); speechSynthesis.speak(make()); } catch (e) {}
+        if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+          try { window.speechSynthesis.resume?.(); window.speechSynthesis.speak(make()); } catch (e) {}
         }
       }, 650);
     } catch (e) {
@@ -87,7 +87,7 @@
         speechPrimed = false;
         primeSpeech();
         setTimeout(() => reliableSpeak('הקול פועל'), 80);
-      } else if ('speechSynthesis' in window) speechSynthesis.cancel();
+      } else if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     };
     parent.appendChild(b);
   }
@@ -98,13 +98,11 @@
     makeButton('homeSoundIconButton', document.querySelector('#home .top'));
     makeButton('tripSoundIconButton', document.querySelector('#trip .top'));
     paintIcons();
-    // Android/PWA speech can require a user gesture before asynchronous navigation starts.
-    // Prime speech on the gesture itself, before startTrip awaits the API call.
     document.addEventListener('pointerdown', e => {
       if (e.target?.closest?.('#startButton,#schoolRouteButton,#homeRouteButton,[data-sound-control="1"]')) primeSpeech();
     }, { passive: true });
     window.speak = reliableSpeak;
-    speechSynthesis?.addEventListener?.('voiceschanged', () => {});
+    window.speechSynthesis?.addEventListener?.('voiceschanged', () => {});
   }
 
   const originalToggle = window.toggleSound;
