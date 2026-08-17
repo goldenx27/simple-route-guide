@@ -1,4 +1,7 @@
 (() => {
+  let originalSpeak = typeof window.speak === 'function' ? window.speak : null;
+  let speechPrimed = false;
+
   function installStyles() {
     if (document.getElementById('soundUiStyles')) return;
     const style = document.createElement('style');
@@ -23,6 +26,53 @@
     });
   }
 
+  function hebrewVoice() {
+    if (!('speechSynthesis' in window)) return null;
+    const voices = speechSynthesis.getVoices?.() || [];
+    return voices.find(v => /^he(-|_)/i.test(v.lang || '')) || voices.find(v => /hebrew/i.test(v.name || '')) || null;
+  }
+
+  function primeSpeech() {
+    if (speechPrimed || !soundEnabled || !('speechSynthesis' in window)) return;
+    try {
+      speechSynthesis.resume?.();
+      const u = new SpeechSynthesisUtterance(' ');
+      u.lang = 'he-IL';
+      u.volume = 0.01;
+      u.rate = 2;
+      const v = hebrewVoice(); if (v) u.voice = v;
+      speechSynthesis.speak(u);
+      speechPrimed = true;
+    } catch (e) {}
+  }
+
+  function reliableSpeak(text) {
+    if (!soundEnabled || !text || !('speechSynthesis' in window)) return;
+    try {
+      speechSynthesis.cancel();
+      speechSynthesis.resume?.();
+      const spoken = String(text).replace(/שטמפפר/g,'Shtampeper');
+      const make = () => {
+        const u = new SpeechSynthesisUtterance(spoken);
+        u.lang = 'he-IL';
+        u.rate = 0.95;
+        u.pitch = 1;
+        u.volume = 1;
+        const v = hebrewVoice(); if (v) u.voice = v;
+        return u;
+      };
+      speechSynthesis.speak(make());
+      setTimeout(() => {
+        if (!soundEnabled) return;
+        if (!speechSynthesis.speaking && !speechSynthesis.pending) {
+          try { speechSynthesis.resume?.(); speechSynthesis.speak(make()); } catch (e) {}
+        }
+      }, 650);
+    } catch (e) {
+      try { originalSpeak?.(text); } catch (_) {}
+    }
+  }
+
   function makeButton(id, parent) {
     if (!parent || document.getElementById(id)) return;
     const b = document.createElement('button');
@@ -33,6 +83,11 @@
     b.onclick = () => {
       toggleSound();
       requestAnimationFrame(paintIcons);
+      if (soundEnabled) {
+        speechPrimed = false;
+        primeSpeech();
+        setTimeout(() => reliableSpeak('הקול פועל'), 80);
+      } else if ('speechSynthesis' in window) speechSynthesis.cancel();
     };
     parent.appendChild(b);
   }
@@ -43,6 +98,13 @@
     makeButton('homeSoundIconButton', document.querySelector('#home .top'));
     makeButton('tripSoundIconButton', document.querySelector('#trip .top'));
     paintIcons();
+    // Android/PWA speech can require a user gesture before asynchronous navigation starts.
+    // Prime speech on the gesture itself, before startTrip awaits the API call.
+    document.addEventListener('pointerdown', e => {
+      if (e.target?.closest?.('#startButton,#schoolRouteButton,#homeRouteButton,[data-sound-control="1"]')) primeSpeech();
+    }, { passive: true });
+    window.speak = reliableSpeak;
+    speechSynthesis?.addEventListener?.('voiceschanged', () => {});
   }
 
   const originalToggle = window.toggleSound;
@@ -55,6 +117,8 @@
   }
 
   window.paintSoundIcons = paintIcons;
+  window.primeSpeech = primeSpeech;
+  window.reliableSpeak = reliableSpeak;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
   else install();
 })();
