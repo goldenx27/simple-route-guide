@@ -1,5 +1,6 @@
 import app from './index';
 import { handlePushApi, PushStore, type PushEnv } from './push';
+import { getOpenBusArrival } from './openbus';
 
 export { PushStore };
 
@@ -71,12 +72,13 @@ async function handleTransitArrival(request: Request, env: Env): Promise<Respons
   const requestUrl = new URL(request.url);
   if (requestUrl.pathname !== '/api/transit/arrival' || request.method !== 'GET') return null;
 
-  // Until the Ministry provides the SIRI-Lite endpoint/key, keep the existing
-  // placeholder response from src/index.ts. This avoids showing a made-up ETA.
-  if (!env.SIRI_ENDPOINT || !env.SIRI_KEY) return null;
-
   const routeId = requestUrl.searchParams.get('route_id') || 'maor-home-school';
   const config = TRANSIT_ROUTES[routeId] || TRANSIT_ROUTES['maor-home-school'];
+
+  // Prefer the Ministry's ExpectedArrivalTime when credentials are available.
+  // Until then, use Open Bus SIRI vehicle positions as a clearly-labelled fallback.
+  if (!env.SIRI_ENDPOINT || !env.SIRI_KEY) return getOpenBusArrival(config);
+
   const siriUrl = new URL(env.SIRI_ENDPOINT);
   siriUrl.searchParams.set('Key', env.SIRI_KEY);
   siriUrl.searchParams.set('MonitoringRef', config.stopId);
@@ -89,18 +91,7 @@ async function handleTransitArrival(request: Request, env: Env): Promise<Respons
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
 
-    if (!response.ok) {
-      return transitJson({
-        line: config.line,
-        stop_id: config.stopId,
-        stop_name: config.stopName,
-        realtime_connected: false,
-        eta_minutes: null,
-        status: 'siri_error',
-        message: `שירות זמן האמת לא זמין כרגע (${response.status})`,
-        updated_at: new Date().toISOString(),
-      }, 502);
-    }
+    if (!response.ok) return getOpenBusArrival(config);
 
     const payload: any = await response.json();
     const now = Date.now();
@@ -124,20 +115,7 @@ async function handleTransitArrival(request: Request, env: Env): Promise<Respons
 
     arrivals.sort((a, b) => a.minutes - b.minutes);
     const next = arrivals[0];
-    if (!next) {
-      return transitJson({
-        line: config.line,
-        stop_id: config.stopId,
-        stop_name: config.stopName,
-        realtime_connected: true,
-        eta_minutes: null,
-        arrivals: [],
-        status: 'NO_UPCOMING_BUS',
-        message: 'לא נמצא כרגע קו 238 שמתקרב לתחנה.',
-        source: 'mot-siri',
-        updated_at: new Date().toISOString(),
-      });
-    }
+    if (!next) return getOpenBusArrival(config);
 
     const guidance = guidanceForEta(next.minutes);
     return transitJson({
@@ -150,19 +128,11 @@ async function handleTransitArrival(request: Request, env: Env): Promise<Respons
       status: guidance.status,
       message: guidance.message,
       source: 'mot-siri',
+      confidence: 'official',
       updated_at: new Date().toISOString(),
     });
   } catch (error) {
-    return transitJson({
-      line: config.line,
-      stop_id: config.stopId,
-      stop_name: config.stopName,
-      realtime_connected: false,
-      eta_minutes: null,
-      status: 'siri_unavailable',
-      message: 'לא הצלחתי לקבל כרגע נתוני זמן אמת. המסלול עצמו ממשיך לעבוד כרגיל.',
-      updated_at: new Date().toISOString(),
-    }, 502);
+    return getOpenBusArrival(config);
   }
 }
 
