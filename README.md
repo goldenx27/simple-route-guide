@@ -6,6 +6,7 @@ Child-friendly guided route MVP, initially built for Maor's school journey.
 The active implementation is now a Cloudflare Worker written in TypeScript.
 
 - `src/index.ts` - route state machine and API
+- `src/main.ts` - Worker entrypoint, push routing and live SIRI integration
 - `public/index.html` - Hebrew mobile UI
 - `wrangler.jsonc` - Worker + Static Assets configuration
 - `schema.sql` - D1 schema for persistent trips
@@ -23,6 +24,30 @@ The older Python/FastAPI files are kept temporarily as reference and are not use
 8. Mark the trip completed.
 
 The UI also includes Hebrew speech, vibration, browser GPS and a simulation mode for testing from home.
+
+## Live bus arrival (SIRI)
+The UI already polls `/api/transit/arrival` every 20 seconds. The Worker can now connect directly to the Ministry of Transport SIRI-Lite service for line 238.
+
+Configured boarding stops:
+
+- School direction: stop `38283` (המכבים/שלונסקי), line `238`
+- Home direction: stop `36743` (אליהו בן חור/אלוף רחבעם זאבי), line `238`
+
+Set the SIRI endpoint as a Worker variable and the key as a secret:
+
+```bash
+npx wrangler secret put SIRI_KEY
+```
+
+Set `SIRI_ENDPOINT` in the Cloudflare Worker environment once the Ministry provides the current SIRI-Lite HTTP GET endpoint.
+
+The Worker sends `Key` and `MonitoringRef`, requests JSON, filters line 238 and returns the next three expected arrivals. Until both `SIRI_ENDPOINT` and `SIRI_KEY` exist, the application deliberately keeps the existing "awaiting SIRI connection" state instead of displaying an estimated or invented ETA.
+
+Guidance based on the next real-time arrival:
+
+- 0–3 minutes: `WAIT_FOR_NEXT`
+- 4–10 minutes: `LEAVE_NOW`
+- More than 10 minutes: `WAIT`
 
 ## Run locally
 
@@ -65,16 +90,16 @@ npx wrangler d1 execute simple-route-guide-db --remote --file=./schema.sql
 The Worker automatically starts persisting and reloading trips when the `DB` binding exists.
 
 ## Current limitations
-- Demo coordinates only; the real approved route still needs to be entered.
-- Bus progress is simulated; no GTFS-Realtime integration yet.
-- No parent dashboard or push notification yet.
+- The real approved walking route still needs final GPS verification.
+- Live bus ETA requires the Ministry of Transport SIRI endpoint and key to be configured in Cloudflare.
+- Bus progress after boarding is still simulated / GPS-assisted rather than sourced from SIRI trip progress.
+- No parent dashboard yet.
 - No authentication yet.
-- Help mode currently changes trip state but does not yet send a real parent notification.
 - Deviation-from-approved-route detection is not implemented yet.
 
 ## Next increment
-1. Deploy the Worker and obtain a live URL.
-2. Create and bind D1.
-3. Replace demo coordinates with Maor's real route.
-4. Add route-corridor/deviation detection.
+1. Configure `SIRI_ENDPOINT` and `SIRI_KEY` after Ministry approval.
+2. Verify live ETA for stop 38283 / line 238.
+3. Connect bus progress after boarding to real-time SIRI data.
+4. Finish route-corridor/deviation detection.
 5. Add parent view and notifications.
