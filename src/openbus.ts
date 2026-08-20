@@ -190,6 +190,7 @@ export async function getOpenBusArrival(config: TransitConfig): Promise<Response
       arrivals: unique,
       status: guidance.status,
       message: guidance.message,
+      display_text: `${config.line} משוער בעוד ${next.minutes} דקות · מבוסס מיקום חי`,
       source: 'open-bus-calculated',
       source_note: 'ETA מחושב ממיקום SIRI חי של Open Bus ומהזמנים המתוכננים בין התחנות; זה אינו ExpectedArrivalTime הרשמי של משרד התחבורה.',
       confidence: 'medium',
@@ -206,3 +207,4 @@ export async function getOpenBusArrival(config: TransitConfig): Promise<Response
     });
   }
 }
+

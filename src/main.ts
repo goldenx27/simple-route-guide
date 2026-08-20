@@ -1,6 +1,8 @@
 import app from './index';
 import { handlePushApi, PushStore, type PushEnv } from './push';
 import { getOpenBusArrival } from './openbus';
+import { getScheduledArrival, type TransitConfig } from './gtfs';
+import { checkGoogleRoutes } from './google-routes';
 
 export { PushStore };
 
@@ -9,6 +11,8 @@ type Env = PushEnv & {
   DB?: D1Database;
   SIRI_ENDPOINT?: string;
   SIRI_KEY?: string;
+  GOOGLE_ROUTES_API_KEY?: string;
+  GOOGLE_ROUTES_TEST_TOKEN?: string;
 };
 
 const PWA_HEAD = [
@@ -21,9 +25,9 @@ const PWA_HEAD = [
   '<meta name="apple-mobile-web-app-title" content="הדרך של מאור">',
 ].join('');
 
-const TRANSIT_ROUTES: Record<string, { line: string; stopId: string; stopName: string }> = {
-  'maor-home-school': { line: '238', stopId: '38283', stopName: 'המכבים/שלונסקי' },
-  'maor-school-home': { line: '238', stopId: '36743', stopName: 'אליהו בן חור/אלוף רחבעם זאבי' },
+const TRANSIT_ROUTES: Record<string, TransitConfig> = {
+  'maor-home-school': { line: '238', stopId: '38283', stopName: 'המכבים/שלונסקי', exitStopId: '38252' },
+  'maor-school-home': { line: '238', stopId: '36743', stopName: 'אליהו בן חור/אלוף רחבעם זאבי', exitStopId: '33734' },
 };
 
 function transitJson(data: unknown, status = 200) {
@@ -70,14 +74,30 @@ function guidanceForEta(minutes: number) {
 
 async function handleTransitArrival(request: Request, env: Env): Promise<Response | null> {
   const requestUrl = new URL(request.url);
-  if (requestUrl.pathname !== '/api/transit/arrival' || request.method !== 'GET') return null;
+  if (request.method !== 'GET') return null;
 
   const routeId = requestUrl.searchParams.get('route_id') || 'maor-home-school';
   const config = TRANSIT_ROUTES[routeId] || TRANSIT_ROUTES['maor-home-school'];
 
+  if (requestUrl.pathname === '/api/transit/google-routes-check' && request.method === 'GET') {
+    return checkGoogleRoutes(request, env, config);
+  }
+  if (requestUrl.pathname !== '/api/transit/arrival' || request.method !== 'GET') return null;
+
+  const openBusThenSchedule = async () => {
+    const openBus = await getOpenBusArrival(config);
+    try {
+      const payload = await openBus.clone().json<{ realtime_connected?: boolean }>();
+      if (payload.realtime_connected) return openBus;
+    } catch (_) {
+      // A malformed fallback must never hide the official planned schedule.
+    }
+    return getScheduledArrival(request, env.ASSETS, config);
+  };
+
   // Prefer the Ministry's ExpectedArrivalTime when credentials are available.
-  // Until then, use Open Bus SIRI vehicle positions as a clearly-labelled fallback.
-  if (!env.SIRI_ENDPOINT || !env.SIRI_KEY) return getOpenBusArrival(config);
+  // Then try live Open Bus positions, and always retain official GTFS as the final layer.
+  if (!env.SIRI_ENDPOINT || !env.SIRI_KEY) return openBusThenSchedule();
 
   const siriUrl = new URL(env.SIRI_ENDPOINT);
   siriUrl.searchParams.set('Key', env.SIRI_KEY);
@@ -91,7 +111,7 @@ async function handleTransitArrival(request: Request, env: Env): Promise<Respons
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
 
-    if (!response.ok) return getOpenBusArrival(config);
+    if (!response.ok) return openBusThenSchedule();
 
     const payload: any = await response.json();
     const now = Date.now();
@@ -115,7 +135,7 @@ async function handleTransitArrival(request: Request, env: Env): Promise<Respons
 
     arrivals.sort((a, b) => a.minutes - b.minutes);
     const next = arrivals[0];
-    if (!next) return getOpenBusArrival(config);
+    if (!next) return openBusThenSchedule();
 
     const guidance = guidanceForEta(next.minutes);
     return transitJson({
@@ -127,12 +147,13 @@ async function handleTransitArrival(request: Request, env: Env): Promise<Respons
       arrivals: arrivals.slice(0, 3),
       status: guidance.status,
       message: guidance.message,
+      display_text: `${config.line} מגיע בעוד ${next.minutes} דקות · זמן אמת`,
       source: 'mot-siri',
       confidence: 'official',
       updated_at: new Date().toISOString(),
     });
   } catch (error) {
-    return getOpenBusArrival(config);
+    return openBusThenSchedule();
   }
 }
 
@@ -155,3 +176,4 @@ export default {
     return new Response(injected,{status:response.status,statusText:response.statusText,headers});
   },
 };
+
